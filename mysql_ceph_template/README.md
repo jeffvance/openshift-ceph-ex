@@ -1,6 +1,6 @@
-## Openshift Enterprise + MySQL + Ceph Persistent Volume
+## Starting MySQL Using an OSE Template
 
-This repo is an example of how to, using the openshift cli (oc), create a very simple mysql application which uses ceph rbd as the persistent store.
+Here is an example of how to, using the openshift cli (oc), create a the mysql application using ceph rbd as the persistent store -- all defined in one OSE template file.
 
 ### Environment:
 * 2 RHEL 7 VMs for running the openshift enterprise (ose) master and node hosts
@@ -13,6 +13,8 @@ The steps needed to seup a simple OSE cluster with 1 master and 1 worker node ar
 The steps needed to setup ceph in a single container (AIO, all-in-one container) are described [here](link).
 
 ### Setting up MySQL:
+Follow the instructions [here](link) to initialize and validate containerized mysql.
+
 OSE's Security Context Constraints (SSC) need to be defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny". Selinux is still enabled/enforcing on the master and worker-node hosts.
 
 ```
