@@ -84,7 +84,7 @@ CONTAINER ID        IMAGE                         COMMAND             CREATED   
 bcd54ae963c2        tutum/mysql                   "/run.sh"           4 seconds ago       Up 2 seconds                        k8s_mysql-from-template.55d85000_ceph-mysql-pod_default_24320626-525a-11e5-9d3b-52540039f12e_612d72e5
 ```
 
-Using the above container ID, we can inspect the docker logs and then run a shell inside this container and access a simple database (previously created), as follows:
+Using the above container ID, we can inspect the docker logs, and then run a shell inside this container to show the ceph/rbd mount and to access a simple database (previously created), as follows:
 
 ```
 $ docker logs bcd54ae963c2
@@ -108,6 +108,9 @@ $ docker exec -it bcd54ae963c2 bash
 root@ceph-mysql-pod:/# ls /var/lib/mysql/
 ib_logfile0  ibdata1     mysql               us_states
 ib_logfile1  lost+found  performance_schema
+
+root@ceph-mysql-pod:/# mount | grep rbd
+/dev/rbd0 on /var/lib/mysql type ext4 (rw,relatime,seclabel,stripe=1024,data=ordered)
 
 root@ceph-mysql-pod:/# mysql
 Welcome to the MySQL monitor.  Commands end with ; or \g.
@@ -154,8 +157,3 @@ root@ceph-mysql-pod:/# exit
 exit
 ```
 
-
-
-
-
-```
