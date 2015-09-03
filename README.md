@@ -13,4 +13,16 @@ Please follow the steps described in [Scott Creely's document](https://github.co
 The steps need to setup ceph in a single container are described at the beginning of [this posting](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e), which is similar to what we'll be doing here, except that kubernetes is used directly in that example, rather than using OSE.
 
 ## Setting up MySQL:
-The [same posting above](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e) also shows how to set up mysql. The tutum/mysql image 
+The [same posting above](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e) also shows how to set up mysql. The tutum/mysql image's *run.sh* script has two chmod's near the beginning, and these commands require that OSE's Security Context Constraints (SSC) are defined such that the seLinuxContext and runAsUser values are "RunAsAny".
+
+```
+oc edit scc prvilege
+oc edit scc restricted
+# change "MustRunAsRange" to "RunAsAny"
+oc get scc
+NAME         PRIV      CAPS      HOSTDIR   SELINUX    RUNASUSER
+privileged   true      []        true      RunAsAny   RunAsAny
+restricted   false     []        false     RunAsAny   RunAsAny
+```
+```
+
