@@ -13,7 +13,7 @@ Please follow the steps described in [Scott Creely's document](https://github.co
 The steps need to setup ceph in a single container are described at the beginning of [this posting](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e), which is similar to what we'll be doing here, except that kubernetes is used directly in that example, rather than using OSE.
 
 ### Setting up MySQL:
-The [same posting above](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e) also shows how to set up mysql. The tutum/mysql image's *run.sh* script has two chmod's near the beginning, and these commands require that OSE's Security Context Constraints (SSC) are defined such that the seLinuxContext and runAsUser values are set to "RunAsAny".
+The [same posting above](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e) also shows how to set up mysql. The tutum/mysql image's *run.sh* script has two chmod's near the beginning, and these commands require that OSE's Security Context Constraints (SSC) are defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny".
 
 ```
 $ oc login -u admin
@@ -27,7 +27,10 @@ privileged   true      []        true      RunAsAny   RunAsAny
 restricted   false     []        false     RunAsAny   RunAsAny
 ```
 **Note:**
-The RHEL 7 hosts running the OSE master and OSE node can and should have selinux set to enabled (*setenforce 1*), and ... iptables / firewalld
+The RHEL-7 hosts running the OSE master and OSE node can and should have the following services enabled and running:
+* selinux (*setenforce 1*)
+* iptables(*systemctl start iptables*)
+* firewalld (*systemctl start firewalld*) Note, if you cannot start firewalld due to the service being masked, you can do a *systemctl unmask firewalld* and then restart it.
 
 
 note: when using the template, if the pvc already exists you'll see this error "Error: persistentvolumeclaims "ceph-claim-template" already exists", but the pod is still launched okay.
