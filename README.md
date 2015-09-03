@@ -33,7 +33,7 @@ The RHEL-7 hosts running the OSE master and OSE node can and should have the fol
 * firewalld (*systemctl start firewalld*) Note, if you cannot start firewalld due to the service being masked, you can do a *systemctl unmask firewalld* and then restart it.
 
 ###MySQL Template:
-The easiest way to start this simple mysql is to use an OSE template file to define the app. The [template](link) specifies the tutum mysql image, the pod, and the volume to be used.
+The easiest way to start this simple mysql is to use an OSE template file to define the app. The [template](link) specifies the tutum mysql image, the pod, and the ceph volume claim to be used.
 
 ```
 # cat ceph-mysql-template.yaml 
