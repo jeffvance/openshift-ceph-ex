@@ -19,10 +19,12 @@ The [same posting above](https://jeffhvance.wordpress.com/2015/07/30/containeriz
 oc edit scc prvilege
 oc edit scc restricted
 # change "MustRunAsRange" to "RunAsAny"
+
 oc get scc
 NAME         PRIV      CAPS      HOSTDIR   SELINUX    RUNASUSER
 privileged   true      []        true      RunAsAny   RunAsAny
 restricted   false     []        false     RunAsAny   RunAsAny
 ```
-```
+
+
 
