@@ -13,7 +13,7 @@ Please follow the steps described in [Scott Creely's document](https://github.co
 The steps need to setup ceph in a single container are described at the beginning of [this posting](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e), which is similar to what we'll be doing here, except that kubernetes is used directly in that example, rather than using OSE.
 
 ### Setting up MySQL:
-The [same posting above](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e) also shows how to set up mysql. The tutum/mysql image's *run.sh* script has two chmod's near the beginning, and these commands require that OSE's Security Context Constraints (SSC) are defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny".
+The [same posting above](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e) also shows how to set up mysql. The tutum/mysql image's *run.sh* script has two chmod's near the beginning, and these commands require that OSE's Security Context Constraints (SSC) are defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny". Note: selinux is still enabled on the master and node hosts.
 
 ```
 $ oc login -u admin
@@ -29,9 +29,53 @@ restricted   false     []        false     RunAsAny   RunAsAny
 **Note:**
 The RHEL-7 hosts running the OSE master and OSE node can and should have the following services enabled and running:
 * selinux (*setenforce 1*)
-* iptables(*systemctl start iptables*)
+* iptables (*systemctl start iptables*)
 * firewalld (*systemctl start firewalld*) Note, if you cannot start firewalld due to the service being masked, you can do a *systemctl unmask firewalld* and then restart it.
 
+###MySQL Template:
+The easiest way to start this simple mysql is to use an OSE template file to define the app. The [template](link) specifies the tutum mysql image, the pod, and the volume to be used.
+
+```
+# cat ceph-mysql-template.yaml 
+
+apiVersion: v1
+kind: Template
+metadata:
+  name: ceph-mysql-template
+  annotations:
+    description: "mysql persistent ceph application template using inline PVC"
+    tags: "ceph mysql pvc"
+
+objects:
+- apiVersion: v1
+  id: ceph-claim-template
+  kind: PersistentVolumeClaim
+  metadata:
+    name: ceph-claim-template
+  spec:
+    accessModes:
+    - ReadWriteMany
+    resources:
+      requests:
+        storage: 1Gi
+
+- apiVersion: v1
+  id: ceph-mysql-pod
+  kind: Pod
+  metadata:
+    name: ceph-mysql-pod
+  spec:
+    containers:
+    - image: tutum/mysql
+      name: mysql-from-template
+      volumeMounts:
+      - mountPath: /var/lib/mysql
+        name: mysql-pv
+    volumes:
+    - name: mysql-pv
+      persistentVolumeClaim:
+        claimName: ceph-claim-template
+```
 
 note: when using the template, if the pvc already exists you'll see this error "Error: persistentvolumeclaims "ceph-claim-template" already exists", but the pod is still launched okay.
 
