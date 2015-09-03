@@ -7,13 +7,13 @@ This repo is an example of how to, using the openshift cli (oc), create a very s
 * 1 Fedora 21 VM for running the ceph all-in-one (AIO) container
 
 ### Setting up Openshift Enterprise (OSE):
-Please follow the steps described in [Scott Creely's document](https://github.com/screeley44/origin/tree/storage_docs/examples/storage-examples/gluster-examples). Remember we are using ceph, not glusterfs, so all gluster steps are skipped.
+The steps needed to seup a simple OSE cluster with 1 master and 1 worker node are described [here](link).
 
 ### Setting up Ceph:
-The steps need to setup ceph in a single container are described at the beginning of [this posting](https://jeffhvance.wordpress.com/2015/07/30/containerized-ceph-kubernetes-mysql/?preview=true&preview_id=4&preview_nonce=f47ab9541e), which is similar to what we'll be doing here, except that kubernetes is used directly in that example, rather than using OSE.
+The steps needed to setup ceph in a single container (AIO, all-in-one container) are described [here](link).
 
 ### Setting up MySQL:
-OSE's Security Context Constraints (SSC) need to be defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny". Selinux will still enabled/enforcing on the master and worker-node hosts.
+OSE's Security Context Constraints (SSC) need to be defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny". Selinux is still enabled/enforcing on the master and worker-node hosts.
 
 ```
 $ oc login -u admin
