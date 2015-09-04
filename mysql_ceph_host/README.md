@@ -11,15 +11,22 @@ The steps needed to setup a simple OSE cluster with 1 master and 1 worker node a
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Defining the Pod Spec File:
-The [pod spec](mysql.yaml) uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides. Before we can create this pod we need to set the selinux context on the OSE host's directory (/opt/mysql) where the database lives. Selinux should remain enabled/enforcing:
+The [pod spec](mysql.yaml) uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides. Before we can create this pod we need to set the selinux context on each OSE host's directory (/opt/mysql) where the mysql pod can be scheduled. This will grant mysql access to the files it needs. The step is repeated on each scheduleable OSE node since the pod could land at any of these hosts. Note: selinux should remain enabled/enforcing:
 
 ```
+# on the OSE master host:
+$ oc get nodes
+NAME              LABELS                                   STATUS
+192.168.122.179   kubernetes.io/hostname=192.168.122.179   Ready,SchedulingDisabled
+192.168.122.254   kubernetes.io/hostname=192.168.122.254   Ready
+
+# on each scheduleable OSE node:
 $ chcon -Rt svirt_sandbox_file_t /opt/mysql
 $ ls -dZ /opt/mysql
 drwxr-xr-x. polkitd ssh_keys system_u:object_r:svirt_sandbox_file_t:s0 /opt/mysql
 
 $ getenforce
-Enforcing
+Enforcing  # correct value
 ```
 
 Now we can create the mysql pod:
