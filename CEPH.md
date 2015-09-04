@@ -62,7 +62,7 @@ $ rbd --image foo -p rbd info
 ```
 
 ### Ceph Secret:
-The ceph-rbd storage plugin uses a ceph secret for authorization. This is a short yaml file created as follows, from the ceph monitor host:
+The ceph-rbd storage plugin uses a ceph secret for authorization. This is a short yaml file created as follows, on the ceph monitor host:
 
 $ ceph auth get-key client.admin
 AQDva7JVEuVJBBAAc8e1ZBWhqUB9K/zNZdOHoQ==
