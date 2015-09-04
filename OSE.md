@@ -35,7 +35,7 @@ $ oc get scc
 NAME         PRIV      CAPS      HOSTDIR   SELINUX    RUNASUSER
 privileged   true      []        true      RunAsAny   RunAsAny
 restricted   false     []        false     RunAsAny   RunAsAny
-```.
+```
 
 ### Additional Verification/Validation:
 
