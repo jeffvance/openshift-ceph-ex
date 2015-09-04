@@ -21,7 +21,7 @@ openshift-infra                  Active
 ```
 
 ### Security:
-OSE Security Context Constraints (SCC) are described in [this OSE document](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html#security-context-constraints). The *privileged* and *restricted* SCCs are added as defaults by OSE and need to be modified in order for mysql and ceph to have sufficient privileges
+OSE Security Context Constraints (SCC) are described in [this OSE document](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html#security-context-constraints). The *privileged* and *restricted* SCCs are added as defaults by OSE and need to be modified in order for mysql and ceph to have sufficient privileges. See also [General OSE Authorization](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html).
 
 After logging-in to OSE as the *admin* user, edit the two SCC files, as shown below:
 
