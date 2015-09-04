@@ -37,10 +37,10 @@ privileged   true      []        true      RunAsAny   RunAsAny
 restricted   false     []        false     RunAsAny   RunAsAny
 ```.
 
-### Additional Verification/Validation::
+### Additional Verification/Validation:
 
+On the OSE master host:
 ```
-# on the OSE master host
 $ systemctl status openshift-master -l
 openshift-master.service - OpenShift Master
    Loaded: loaded (/usr/lib/systemd/system/openshift-master.service; enabled)
@@ -56,8 +56,8 @@ Sep 04 00:46:02 rhel7-ose-1 openshift-master[49702]: I0904 00:46:02.803183   497
 Sep 04 00:46:03 rhel7-ose-1 openshift-master[49702]: I0904 00:46:03.001061   49702 controller.go:85] Ignoring DeploymentConfig change for default/docker-registry:2 (latestVersion=2); same as Deployment default/docker-registry-2
 ```
 
+On an OSE worker-node:
 ```
-# on an OSE worker-node:
 $ systemctl status openshift-node -l
 openshift-node.service - OpenShift Node
    Loaded: loaded (/usr/lib/systemd/system/openshift-node.service; enabled)
