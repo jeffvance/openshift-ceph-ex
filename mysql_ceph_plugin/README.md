@@ -14,30 +14,10 @@ The steps needed to setup ceph in a single container (AIO, all-in-one container)
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Defining the Pod Spec File:
-Here is a simple pod spec which uses the same mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides:
-```
-apiVersion: v1
-kind: Pod
-metadata:
-  name: mysql
-  labels: 
-    name: mysql
-spec: 
-  containers: 
-    - image: mysql
-      name: mysql
-      volumeMounts:
-        - name: varlibmysql
-          mountPath: /var/lib/mysql
-      env:        - name: MYSQL_ROOT_PASSWORD
-          value: foopass
-  volumes:
-    - name: varlibmysql
-      hostPath: 
-        path: /opt/mysql
-```
+We're using a simple [pod spec](mysql-ceph-pod.yaml) which uses the same mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides.
 
-Before we can create this pod we need to set the selinux context on the OSE host's directory (/opt/mysql) where the database lives. Selinux should remain enabled/enforcing:
+But before we can create this pod we need to set the selinux context on each scheduleable OSE host's directory (/opt/mysql) where the database lives. Selinux should remain enabled/enforcing on all hosts:
+
 ```
 $ chcon -Rt svirt_sandbox_file_t /opt/mysql
 $ ls -dZ /opt/mysql
@@ -48,6 +28,7 @@ Enforcing
 ```
 
 Now we can create the mysql pod:
+
 ```
 $ oc create -f mysql.yaml 
 pods/mysql
@@ -58,18 +39,15 @@ mysql                     1/1       Running         0          18s
 ```
 
 To see which OSE host the mysql pod has been scheduled on:
+
 ```
 $ oc describe pod mysql
-NAME                      READY     STATUS                                                                                               RESTARTS   AGE
-docker-registry-2-223nv   0/1       Image: registry.access.redhat.com/openshift3/ose-docker-registry:v3.0.1.0 is not ready on the node   0          3d
-mysql                     1/1       Running                                                                                              0          18s
-[root@rhel7-ose-1 ceph]# oc describe pod mysql
 Name:				mysql
-Namespace:			default
-Image(s):			mysql
+Namespace:	default
+Image(s):		mysql
 Node:				192.168.122.254/192.168.122.254  ## <--- the hostname is often shown here
-Labels:				name=mysql
-Status:				Running
+Labels:			name=mysql
+Status:			Running
 Reason:				
 Message:			
 IP:				10.1.0.41
@@ -91,7 +69,8 @@ Events:
   Thu, 03 Sep 2015 19:10:15 -0400	Thu, 03 Sep 2015 19:10:15 -0400	1	{kubelet 192.168.122.254}	spec.containers{mysql}			startedStarted with docker id 77f4af567e3d
 ```
 
-On the scheduled OSE host run docker to get information about the mysql container:
+On the target OSE host run docker to get information about the mysql container:
+
 ```
 $ docker ps
 CONTAINER ID        IMAGE                         COMMAND                CREATED             STATUS              PORTS               NAMES
@@ -99,8 +78,7 @@ CONTAINER ID        IMAGE                         COMMAND                CREATED
 dca749fa3530        openshift3/ose-pod:v3.0.1.0   "/pod"                 5 minutes ago       Up 5 minutes                            k8s_POD.892ec37e_mysql_default_ea9b64de-5290-11e5-b56b-52540039f12e_aa534a81
 
 $ docker inspect mysql
-[
-{
+[{
     "Id": "7eee2d462c8f6ffacfb908cc930559e21778f60afdb2d7e9cf0f3025274d7ea8",
     "Parent": "15a3cddfc178c4dbaa8f56142d4eebef6d22a3cd1842820844cf815992fe5a13",
     "Comment": "",
@@ -188,8 +166,7 @@ $ docker inspect mysql
     "Os": "linux",
     "Size": 0,
     "VirtualSize": 283575255
-}
-]
+}]
 
 $ docker logs 77f4af567e3d   # <--- container ID
 2015-09-03 23:10:17 0 [Note] mysqld (mysqld 5.6.26) starting as process 1 ...
