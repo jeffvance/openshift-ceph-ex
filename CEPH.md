@@ -82,5 +82,5 @@ secrets/ceph-secret
 $ oc get secret
 NAME                  TYPE                                  DATA
 ceph-secret           Opaque                                1
-default-token-clny6   kubernetes.io/service-account-token   1
+...
 ```
