@@ -113,3 +113,39 @@ root@ceph-mysql:/# mount | grep rbd
 root@ceph-mysql:/# exit
 exit
 ```
+
+Mysql can also be run in the container as follows:
+
+```
+$ docker exec -it 9a43017dbebf bash
+root@ceph-mysql:/# mysql                                                       
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+...
+mysql> show databases;
++---------------------+
+| Database            |
++---------------------+
+| information_schema  |
+| #mysql50#lost+found |
+| mysql               |
+| performance_schema  |
+| us_states           |
++---------------------+
+5 rows in set (0.00 sec)
+
+mysql> use us_states;
+Reading table information for completion of table and column names
+...
+mysql> select * from states;
++----+---------+------------+
+| id | state   | population |
++----+---------+------------+
+|  1 | Alabama |    4822023 |
++----+---------+------------+
+1 row in set (0.00 sec)
+
+mysql> quit
+Bye
+root@ceph-mysql:/# exit
+exit
+```
