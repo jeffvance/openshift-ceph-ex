@@ -95,7 +95,7 @@ CONTAINER ID        IMAGE                         COMMAND                CREATED
 acbee2db9a18        openshift3/ose-pod:v3.0.1.0   "/pod"                 4 minutes ago       Up 4 minutes                            k8s_POD.dbbbe7c7_ceph-mysql_default_608af6aa-5335-11e5-b56b-52540039f12e_d030f08f 
 ```
 
-The mysql container ID is 9a43017dbebf. More details on this container are availble via *docker inspect <container-ID-or-name> *. Log information is shown via *docker logs <container-ID> *, and via the *systemctl status openshift-node -l* and *journalctl -xe -u openshift-node docker* commands.
+The mysql container ID is 9a43017dbebf. More details on this container are availble via *docker inspect container-ID-or-name*. Log information is shown via *docker logs container-ID*, and via the *systemctl status openshift-node -l* and *journalctl -xe -u openshift-node docker* commands.
 
 The container's rbd mounts are visible directly from the host and from within the container itself. On the OSE host:
 
