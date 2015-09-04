@@ -1,4 +1,4 @@
-## Using the Ceph-RBD Plugin:
+## Example 2: Using the Ceph-RBD Plugin
 This example uses the ceph/rbd plugin directly in the pod spec.
 
 ### Environment:
