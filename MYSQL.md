@@ -1,6 +1,6 @@
 ## Setting Up and Validating Containerized MySQL:
 
-First, OSE's Security Context Constraints (SSC) need to be defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny". Selinux is still enabled/enforcing on the master and worker-node hosts, as decribed in the [OSE environment readme](../ENV.md).
+First, OSE's Security Context Constraints (SSC) need to be defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny". Selinux is still enabled/enforcing on the master and worker-node hosts, as decribed in the [OSE environment readme](ENV.md).
 
 Our mysql example uses the official mysql image found [here](https://hub.docker.com/_/mysql/). First, pull down the image on each of your OSE worker nodes:
 ```
