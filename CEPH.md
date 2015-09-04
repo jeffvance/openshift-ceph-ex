@@ -60,3 +60,32 @@ $ rbd --image foo -p rbd info
          block_name_prefix: rb.0.100f.74b0dc51
          format: 1
 ```
+
+### Ceph Secret:
+The ceph-rbd storage plugin uses a ceph secret for authorization. This is a short yaml file created as follows, from the ceph monitor host:
+
+$ ceph auth get-key client.admin
+AQDva7JVEuVJBBAAc8e1ZBWhqUB9K/zNZdOHoQ==
+
+$ echo "AQDva7JVEuVJBBAAc8e1ZBWhqUB9K/zNZdOHoQ=="| base64
+QVFEdmE3SlZFdVZKQkJBQWM4ZTFaQldocVVCOUsvek5aZE9Ib1E9PQo=
+# copy the above output
+
+Create the [ceph-secret file](ceph-secret.yaml):
+
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ceph-secret
+data:
+  key: QVFEdmE3SlZFdVZKQkJBQWM4ZTFaQldocVVCOUsvek5aZE9Ib1E9PQo=
+ 
+$ oc create -f ceph-secret.yaml 
+secrets/ceph-secret
+ 
+$ oc get secret
+NAME                  TYPE                                  DATA
+ceph-secret           Opaque                                1
+default-token-clny6   kubernetes.io/service-account-token   1
+```
