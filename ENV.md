@@ -11,4 +11,4 @@ The RHEL-7 hosts running the OSE master and OSE nodes should have the following 
 ### Other Installations:
 1. [OSE installation](OSE.md)
 2. [Ceph installation](CEPH.md)
-3. [MySQL insallation](MYSQL.md)
+3. [MySQL installation](MYSQL.md)
