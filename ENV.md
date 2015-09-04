@@ -8,6 +8,9 @@ The RHEL-7 hosts running the OSE master and OSE nodes should have the following 
 * iptables (*systemctl start iptables*)
 * firewalld (*systemctl start firewalld*) Note, if you cannot start firewalld due to the service being masked, you can do a *systemctl unmask firewalld* and then restart it.
 
+### OSE Installation
+The installation of OSE is described [here](OSE.md), and must be complete prior to running the *oc* commands below.
+
 After logging-in to OSE as the *admin* user, edit the two scc files, as shown below:
 ```
 $ oc login -u admin
