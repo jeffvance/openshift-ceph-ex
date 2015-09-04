@@ -25,7 +25,7 @@ $ docker pull ceph/demo
 #create the monitor, osd, and rgw as separate containers
  
 $ docker run --net=host -v /etc/ceph:/etc/ceph -v /var/lib/ceph:/var/lib/ceph \
-  -e MON_IP=192.168.122.133-e CEPH_NETWORK=192.168.122.0/24 ceph/demo
+  -e MON_IP=192.168.122.133 -e CEPH_NETWORK=192.168.122.0/24 ceph/demo
  
 $ ps -e | grep ceph
 29242 ?        00:00:30 ceph
