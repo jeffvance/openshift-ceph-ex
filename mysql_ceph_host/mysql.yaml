@@ -13,7 +13,7 @@ spec:
           mountPath: /var/lib/mysql
       env:
         - name: MYSQL_ROOT_PASSWORD
-          value: jeff
+          value: foopass
   volumes:
     - name: varlibmysql
       hostPath: 
