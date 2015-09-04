@@ -17,8 +17,8 @@ Most of the examples use ceph-rbd within a single container (AIO, all-in-one con
 Follow the instructions [here](MYSQL.md) to initialize and validate containerized mysql.
 
 ### Specific Examples:
-* [mysql + local/host storage](mysql_ceph_host) - mysql database lives on the OSE host where the pod is scheduled
-* [mysql + ceph plugin](mysql_ceph_plugin) - mysql database resides in ceph, a rbd plugin is specfied
-* [mysql + ceph + pvc](mysql_ceph_pvc) - mysql database resides in ceph, a Persistent Volume (PV) and Persistent Volume Claim (PVC) are used
-* [mysql + ceph + template](mysql_ceph_template) -- same as the above example except the pod and pvc are defined in a single template file
+1. [mysql + local/host storage](mysql_ceph_host) - mysql database lives on the OSE host where the pod is scheduled
+2. [mysql + ceph plugin](mysql_ceph_plugin) - mysql database resides in ceph, a rbd plugin is specfied
+3. [mysql + ceph + pvc](mysql_ceph_pvc) - mysql database resides in ceph, a Persistent Volume (PV) and Persistent Volume Claim (PVC) are used
+4. [mysql + ceph + template](mysql_ceph_template) -- same as the above example except the pod and pvc are defined in a single template file
 
