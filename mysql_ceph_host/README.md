@@ -1,4 +1,4 @@
-## Using Local (hostPath) Storage:
+## Example 1: Using Local (hostPath) Storage
 This example uses the local storage directly on the OSE host where the mysql container is running.
 
 ### Environment:
