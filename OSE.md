@@ -20,7 +20,24 @@ openshift                        Active
 openshift-infra                  Active
 ```
 
-Additional checking can include:
+### Security:
+OSE Security Context Constraints (SCC) are described in [this OSE document](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html#security-context-constraints). The *privileged* and *restricted* SCCs are added as defaults by OSE and need to be modified in order for mysql and ceph to have sufficient privileges
+
+After logging-in to OSE as the *admin* user, edit the two SCC files, as shown below:
+
+```
+$ oc login -u admin
+$ oc edit scc prvilege
+$ oc edit scc restricted
+#change "MustRunAsRange" to "RunAsAny"
+
+$ oc get scc
+NAME         PRIV      CAPS      HOSTDIR   SELINUX    RUNASUSER
+privileged   true      []        true      RunAsAny   RunAsAny
+restricted   false     []        false     RunAsAny   RunAsAny
+```.
+
+### Additional Verification/Validation::
 
 ```
 # on the OSE master host
