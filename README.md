@@ -2,7 +2,7 @@
 
 This repo contains examples showing how to run MySQL in a container directly from docker, via a kubernetes pod or template, both using local host storage or using ceph-rbd block storage to persist the database.
 
-The next few sections are common across almost all of the examples and are also shown below and in each example:
+The next few sections are common across almost all of the examples and are also shown below:
 
 ### Environment:
 The enviromnent used for all of the examples in this repo is described [here](ENV.md).
