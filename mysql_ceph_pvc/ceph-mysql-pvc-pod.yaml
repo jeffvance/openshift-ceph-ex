@@ -1,0 +1,20 @@
+---
+  apiVersion: v1
+  id: mysql
+  kind: Pod
+  metadata: 
+    name: ceph-mysql
+  spec: 
+    containers: 
+      - name: ceph-mysql
+        image: tutum/mysql
+        ports:
+          - name: mysql-db
+            containerPort: 3306
+        volumeMounts: 
+          - name: mysql-pv
+            mountPath: /var/lib/mysql
+    volumes: 
+      - name: mysql-pv
+        persistentVolumeClaim:
+          claimName: ceph-claim
