@@ -15,7 +15,7 @@ The steps needed to setup ceph in a single container (AIO, all-in-one container)
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Defining the PV and PVC Files:
-A persistent volume is created from a file defining the name, capacity, and access methods for persistent storage. The PV spec used in this example is [here](ceph-mysql-pv.yaml), and the PVC is [here](ceph-mysql-claim.yaml).
+A persistent volume is created from a file defining the name, capacity, and access methods for persistent storage. The PV spec used in this example is [here](ceph-pv.yaml), and the PVC is [here](ceph-claim.yaml).
 
 PVs are typically created by an OSE administrator, whereas PVCs will typically be created and requested by non-admins. The example here creates both the PV and claim separate from the pod. There is also a [template](../mysql_ceph_template) example which defines the PVC in the same file used to define the pod.
 
