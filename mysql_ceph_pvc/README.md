@@ -19,6 +19,29 @@ A persistent volume is created from a file defining the name, capacity, and acce
 
 PVs are typically created by an OSE administrator, whereas PVCs will typically be created and requested by non-admins. The example here creates both the PV and claim separate from the pod. There is also a [template](../mysql_ceph_template) example which defines the PVC in the same file used to define the pod.
 
+### Creating the PV and PVC:
+*oc create -f* is used to create almost all OSE objects and is used here to create the ceph PV and PVC.
+
+```
+$ oc create -f ceph-pv.yaml
+persistentvolumes/ceph-pv
+
+$ oc get pv
+NAME                 LABELS    CAPACITY     ACCESSMODES   STATUS      CLAIM                   REASON
+ceph-pv              <none>    2147483648   RWX           Available             
+
+$ oc create -f ceph-claim.yaml
+persistentvolumeclaims/ceph-claim
+
+# oc get pvc
+NAME            LABELS    STATUS    VOLUME
+ceph-claim      map[]     Bound     ceph-pv
+```
+
+Notice that the claim has been bound to the "ceph-pv" persistent volume.
+
+### Defining the Pod:
+
 uses the same mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides:
 
 
