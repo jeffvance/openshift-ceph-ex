@@ -1,6 +1,6 @@
 ## MySQL + PVClaim in Single OSE Template:
 
-Here is an example of how to create the mysql application using ceph rbd as the persistent store -- all defined in one OSE template file.
+Here is an example showing how to create the mysql application using ceph rbd as the persistent store, where the pod and persistent volume claim (PVC) are both defined in one OSE template file.
 
 ### Environment:
 The enviromnent used for all of the examples in this repo is described [here](../ENV.md).
