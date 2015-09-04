@@ -1,5 +1,5 @@
 ## Using Local (hostPath) Storage:
-This example uses the local storage directly on the OSE host where the mysql container is running..
+This example uses the local storage directly on the OSE host where the mysql container is running.
 
 ### Environment:
 The enviromnent used for all of the examples in this repo is described [here](../ENV.md).
