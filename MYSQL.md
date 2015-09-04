@@ -2,6 +2,7 @@
 
 First, OSE's Security Context Constraints (SSC) need to be defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny". Selinux is still enabled/enforcing on the master and worker-node hosts.
 
+After logging-in to OSE and the *admin* user, edit the two scc files, as shown below:
 ```
 $ oc login -u admin
 $ oc edit scc prvilege
