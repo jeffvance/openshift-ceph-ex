@@ -11,31 +11,8 @@ The steps needed to seup a simple OSE cluster with 1 master and 1 worker node ar
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Defining the Pod Spec File:
-The pod spec uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides:
+The [pod spec](mysql.yaml) uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides: Before we can create this pod we need to set the selinux context on the OSE host's directory (/opt/mysql) where the database lives. Selinux should remain enabled/enforcing:
 
-```
-apiVersion: v1
-kind: Pod
-metadata:
-  name: mysql
-  labels: 
-    name: mysql
-spec: 
-  containers: 
-    - image: mysql
-      name: mysql
-      volumeMounts:
-        - name: varlibmysql
-          mountPath: /var/lib/mysql
-      env:        - name: MYSQL_ROOT_PASSWORD
-          value: foopass
-  volumes:
-    - name: varlibmysql
-      hostPath: 
-        path: /opt/mysql
-```
-
-Before we can create this pod we need to set the selinux context on the OSE host's directory (/opt/mysql) where the database lives. Selinux should remain enabled/enforcing:
 ```
 $ chcon -Rt svirt_sandbox_file_t /opt/mysql
 $ ls -dZ /opt/mysql
@@ -46,6 +23,7 @@ Enforcing
 ```
 
 Now we can create the mysql pod:
+
 ```
 $ oc create -f mysql.yaml 
 pods/mysql
@@ -56,6 +34,7 @@ mysql                     1/1       Running         0          18s
 ```
 
 To see which OSE host the mysql pod has been scheduled on:
+
 ```
 $ oc describe pod mysql
 NAME                      READY     STATUS                                                                                               RESTARTS   AGE
@@ -90,6 +69,7 @@ Events:
 ```
 
 On the scheduled OSE host, run docker to get information about the mysql container:
+
 ```
 $ docker ps
 CONTAINER ID        IMAGE                         COMMAND                CREATED             STATUS              PORTS               NAMES
