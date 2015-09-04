@@ -30,7 +30,7 @@ Enforcing
 Now we can create the mysql pod:
 
 ```
-$ oc create -f mysql.yaml 
+$ oc create -f mysql-ceph-pod.yaml 
 pods/mysql
 
 $ oc get pod
