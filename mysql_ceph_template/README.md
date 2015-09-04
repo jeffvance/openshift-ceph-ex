@@ -51,7 +51,7 @@ NAME                 LABELS    CAPACITY     ACCESSMODES   STATUS     CLAIM      
 ceph-pv              <none>    2147483648   RWX           Released   default/ceph-claim 
 ```
 
-Notice that the "ceph-claim" is gone and that the "ceph-pv" is Released. This may be a bug, but currently a new claim cannot bind to a Released PV; therefore, we have to also delete and recreate the PV before we can start mysql from the tmeplate.
+Notice that the "ceph-claim" is gone and that the "ceph-pv" is Released. This may be a bug, but currently a new claim cannot bind to a Released PV; therefore, we have to also delete and recreate the PV before we can start mysql from the template.
 
 ```
 $ oc delete pv 
@@ -75,6 +75,18 @@ $ oc new-app ceph-mysql-template
 persistentvolumeclaims/ceph-claim-template
 pods/ceph-mysql-pod
 Run 'oc status' to view your app.
+```
+
+Check on the PV, PVC and pod:
+
+```
+$ oc get pvc
+NAME                  LABELS    STATUS    VOLUME
+ceph-claim-template   map[]     Bound     ceph-pv
+
+$ oc get pv
+NAME                 LABELS    CAPACITY     ACCESSMODES   STATUS    CLAIM                         REASON
+ceph-pv              <none>    2147483648   RWX           Bound     default/ceph-claim-template 
 
 $ oc get pods
 NAME                      READY     STATUS  RESTARTS   AGE
@@ -83,66 +95,51 @@ ceph-mysql-pod            1/1       Running 0          25s
 $ oc describe pod ceph-mysql-pod
 Name:				ceph-mysql-pod
 Namespace:			default
-Image(s):			tutum/mysql
+Image(s):			mysql
 Node:				192.168.122.254/192.168.122.254
 Labels:				<none>
 Status:				Running
 Reason:				
 Message:			
-IP:				10.1.0.19
+IP:				10.1.0.44
 Replication Controllers:	<none>
 Containers:
   mysql-from-template:
-    Image:		tutum/mysql
+    Image:		mysql
     State:		Running
-      Started:		Thu, 03 Sep 2015 12:39:14 -0400
+      Started:		Fri, 04 Sep 2015 16:04:11 -0400
     Ready:		True
-    Restart Count:	1
+    Restart Count:	0
 Conditions:
   Type		Status
   Ready 	True 
 Events:
   FirstSeen				LastSeen			Count	From				SubobjectPath				Reason	Message
-  Thu, 03 Sep 2015 12:38:01 -0400	Thu, 03 Sep 2015 12:38:01 -0400	1	{scheduler }								scheduled	Successfully assigned ceph-mysql-pod to 192.168.122.254
-  Thu, 03 Sep 2015 12:38:03 -0400	Thu, 03 Sep 2015 12:38:03 -0400	1	{kubelet 192.168.122.254}	implicitly required container POD	pulled	Pod container image "openshift3/ose-pod:v3.0.1.0" already present on machine
-...
-```
+  Fri, 04 Sep 2015 15:39:41 -0400	Fri, 04 Sep 2015 15:39:41 -0400	1	{scheduler }								scheduled	Successfully assigned ceph-mysql-pod to 192.168.122.254
 
-Above, you can see that the pod was scheduled to run on node 192.168.122.254 (often the hostname is shown here). On the target openshift-node you can see the container being run as follows:
+  Fri, 04 Sep 2015 16:04:04 -0400	Fri, 04 Sep 2015 16:04:04 -0400	1	{kubelet 192.168.122.254}	implicitly required container POD	pulled	Pod container image "openshift3/ose-pod:v3.0.1.0" already present on machine
+  Fri, 04 Sep 2015 16:04:07 -0400	Fri, 04 Sep 2015 16:04:07 -0400	1	{kubelet 192.168.122.254}	implicitly required container POD	createdCreated with docker id 5d310cd5ddc2
+  Fri, 04 Sep 2015 16:04:07 -0400	Fri, 04 Sep 2015 16:04:07 -0400	1	{kubelet 192.168.122.254}	implicitly required container POD	startedStarted with docker id 5d310cd5ddc2
+  Fri, 04 Sep 2015 16:04:11 -0400	Fri, 04 Sep 2015 16:04:11 -0400	1	{kubelet 192.168.122.254}	spec.containers{mysql-from-template}	createdCreated with docker id 183be9a22a13
+  Fri, 04 Sep 2015 16:04:11 -0400	Fri, 04 Sep 2015 16:04:11 -0400	1	{kubelet 192.168.122.254}	spec.containers{mysql-from-template}	startedStarted with docker id 183be9a22a13
+```
+On the target OSE node we can verify that msql is working:
 
 ```
 $ docker ps
-CONTAINER ID        IMAGE                         COMMAND             CREATED             STATUS            PORTS              NAMES
-bcd54ae963c2        tutum/mysql                   "/run.sh"           4 seconds ago       Up 2 seconds                        k8s_mysql-from-template.55d85000_ceph-mysql-pod_default_24320626-525a-11e5-9d3b-52540039f12e_612d72e5
-```
-
+CONTAINER ID        IMAGE                         COMMAND                CREATED             STATUS              PORTS               NAMES
+183be9a22a13        mysql                         "/entrypoint.sh mysq   5 minutes ago       Up 5 minutes                            k8s_mysql-from-template.b4384d92_ceph-mysql-pod_default_af388e69-533c-11e5-b56b-52540039f12e_faf1cdc0   
+5d310cd5ddc2        openshift3/ose-pod:v3.0.1.0   "/pod"                 5 minutes ago       Up 5 minutes                            k8s_POD.892ec37e_ceph-mysql-pod_default_af388e69-533c-11e5-b56b-52540039f12e_ede13b32 
 Using the above container ID, we can inspect the docker logs, and then run a shell inside this container to show the ceph/rbd mount and to access a simple database (previously created), as follows:
+```
+
+And, as in other examples, we can shell into the running mysql container and execute mysql:
 
 ```
-$ docker logs bcd54ae963c2
-=> Using an existing volume of MySQL
-=> Starting MySQL ...
-=> Waiting for confirmation of MySQL service startup, trying 0/60 ...
-=> Waiting for confirmation of MySQL service startup, trying 1/60 ...
-tail -F $LOG
-150903 16:48:39  InnoDB: Waiting for the background threads to start
-150903 16:48:40 InnoDB: 5.5.44 started; log sequence number 1599201
-150903 16:48:40 [Note] Server hostname (bind-address): '0.0.0.0'; port: 3306
-150903 16:48:40 [Note]   - '0.0.0.0' resolves to '0.0.0.0';
-150903 16:48:40 [Note] Server socket created on IP: '0.0.0.0'.
-150903 16:48:40 [Warning] 'user' entry 'root@ceph-mysql' ignored in --skip-name-resolve mode.
-150903 16:48:40 [Warning] 'proxies_priv' entry '@ root@ceph-mysql' ignored in --skip-name-resolve mode.
-150903 16:48:40 [Note] Event Scheduler: Loaded 0 events
-150903 16:48:40 [Note] /usr/sbin/mysqld: ready for connections.
-Version: '5.5.44-0ubuntu0.14.04.1'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  (Ubuntu)
-
-$ docker exec -it bcd54ae963c2 bash
+$ docker exec -it 183be9a22a13 bash
 root@ceph-mysql-pod:/# ls /var/lib/mysql/
 ib_logfile0  ibdata1     mysql               us_states
 ib_logfile1  lost+found  performance_schema
-
-root@ceph-mysql-pod:/# mount | grep rbd
-/dev/rbd0 on /var/lib/mysql type ext4 (rw,relatime,seclabel,stripe=1024,data=ordered)
 
 root@ceph-mysql-pod:/# mysql
 Welcome to the MySQL monitor.  Commands end with ; or \g.
@@ -188,4 +185,3 @@ Bye
 root@ceph-mysql-pod:/# exit
 exit
 ```
-
