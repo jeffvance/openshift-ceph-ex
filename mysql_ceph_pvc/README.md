@@ -1,4 +1,4 @@
-## MySQL + Ceph + Persistent Volume (PV) + PV Claim (PVC)
+## Using MySQL, Ceph Persistent Volume and Claim:
 
 Here is an example of how to create the mysql application, using ceph rbd as the persistent store, where the ceph rbd is defined in a PV, and the pod uses a claim rather than defining the rbd volume inline. The kubernetetes PVClaimBinder matches the pod's claim against PVs and binds the claim to the PV that has the best match. Today, the matching criteria is very simple -- capacity and sharing attributes -- but, hopefully richer PV and PVC definitions will be coming in the future.  See  the [kubernetes persistent storage](https://github.com/kubernetes/kubernetes/blob/master/docs/design/persistent-storage.md) document for more information on PVs and PVCs.
 
