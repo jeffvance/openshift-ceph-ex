@@ -8,20 +8,7 @@ The RHEL-7 hosts running the OSE master and OSE nodes should have the following 
 * iptables (*systemctl start iptables*)
 * firewalld (*systemctl start firewalld*) Note, if you cannot start firewalld due to the service being masked, you can do a *systemctl unmask firewalld* and then restart it.
 
-### OSE Installation
-The installation of OSE is described [here](OSE.md), and must be completed prior to running the *oc* commands below.
-
-After logging-in to OSE as the *admin* user, edit the two scc files, as shown below:
-```
-$ oc login -u admin
-$ oc edit scc prvilege
-$ oc edit scc restricted
-#change "MustRunAsRange" to "RunAsAny"
-
-$ oc get scc
-NAME         PRIV      CAPS      HOSTDIR   SELINUX    RUNASUSER
-privileged   true      []        true      RunAsAny   RunAsAny
-restricted   false     []        false     RunAsAny   RunAsAny
-```
-
-Now, OSE is ready to run mysql with ceph as the persistent store.
+### Other Installations:
+1. [OSE installation](OSE.md)
+2. [Ceph installation](CEPH.md)
+3. [MySQL insallation](MYSQL.md)
