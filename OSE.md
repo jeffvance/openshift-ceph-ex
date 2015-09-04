@@ -80,3 +80,5 @@ $ systemctl status docker -l
 $ journalctl -xe -u openshift-master  # and on the OSE node:
 $ journalctl -xe -u openshift-node
 ```
+
+It's often necessary to scroll right (right arrow) to see pertinent info.
