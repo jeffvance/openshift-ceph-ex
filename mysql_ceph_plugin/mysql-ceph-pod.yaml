@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql
+  labels: 
+    name: mysql
+spec: 
+  containers: 
+    - image: mysql
+      name: mysql
+      volumeMounts:
+        - name: mysql-ceph
+          mountPath: /var/lib/mysql
+  volumes:
+    - name: mysql-ceph
+      rbd: 
+        monitors: 
+          - 192.168.122.133:6789
+        pool: rbd
+        image: foo
+        user: admin
+        secretRef: 
+          name: ceph-secret
+        fsType: ext4
+        readOnly: false
