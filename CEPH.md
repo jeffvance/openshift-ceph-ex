@@ -9,18 +9,18 @@ The enviromnent used for all of the examples in this repo is described [here](..
 A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which shows up as */dev/vdb*. Install ceph-common (client libraries) so that the OSE pod running mysql can do the ceph RBD mount .
 
 ```
-yum install -y ceph-common
+$ yum install -y ceph-common
  
 # for now there is a ceph packaging bug where the ceph-rbdnamer
 # code is missing from ceph-common, therefore ceph also needs to
 # be installed on the node
-yum install -y ceph
+$ yum install -y ceph
 ```
 
 Pull ceph-docker and run all of the ceph processes inside a single Docker container:
 
 ```
-# docker pull ceph/demo
+$ docker pull ceph/demo
 #stash the image locally. At some point I will need to use the ceph/daemon image to
 #create the monitor, osd, and rgw as separate containers
  
@@ -43,22 +43,20 @@ From a different terminal window on the same F21 ceph VM, create an rbd image (n
 
 ```
 # Note: sometimes the command "modprobe rbd" is required
-rbd create foo -s 1024 #creates a rbd image named "foo", 1GB in size
-rbd map foo
+$ rbd create foo -s 1024 #creates a rbd image named "foo", 1GB in size
+$ rbd map foo
  
-rbd showmapped   #get the rbd dev, here it's /dev/rbd0
+$ rbd showmapped   #get the rbd dev, here it's /dev/rbd0
 id pool image snap device 
 0 rbd foo - /dev/rbd0
  
 # create a file system on the block dev
-mkfs.ext4 /dev/rbd0 #same rbdX as above
+$ mkfs.ext4 /dev/rbd0 #same rbdX as above
  
-rbd --image foo -p rbd info
+$ rbd --image foo -p rbd info
      rbd image 'foo':
          size 1024 MB in 256 objects
          order 22 (4096 kB objects)
          block_name_prefix: rb.0.100f.74b0dc51
          format: 1
 ```
-
-
