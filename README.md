@@ -8,7 +8,7 @@ The next few sections are common across almost all of the examples and are also 
 The enviromnent used for all of the examples in this repo is described [here](ENV.md).
 
 ### Setting up Openshift Enterprise (OSE):
-The steps needed to seup a simple OSE cluster with 1 master and 1 worker node are described [here](OSE.md).
+The steps needed to setup a simple OSE cluster with 1 master and 1 worker node are described [here](OSE.md).
 
 ### Setting up Ceph:
 Most of the examples use ceph-rbd within a single container (AIO, all-in-one container), and the steps needed to setup ceph are described [here](CEPH.md).
