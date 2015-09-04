@@ -3,8 +3,7 @@
 Here is an example of how to, using the openshift cli (oc), create a the mysql application using ceph rbd as the persistent store -- all defined in one OSE template file.
 
 ### Environment:
-* 2 RHEL 7 VMs for running the openshift enterprise (ose) master and node hosts
-* 1 Fedora 21 VM for running the ceph all-in-one (AIO) container
+The enviromnent used for all of the examples in this repo is described [here](../ENV.md).
 
 ### Setting up Openshift Enterprise (OSE):
 The steps needed to seup a simple OSE cluster with 1 master and 1 worker node are described [here](link).
