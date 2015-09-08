@@ -8,6 +8,21 @@ The enviromnent used for all of the examples in this repo is described [here](EN
 ### Ceph:
 A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which shows up as */dev/vdb*. Install ceph-common (client libraries) so that the OSE pod running mysql can do the ceph RBD mount .
 
+Fedora 21 has docker pre-installed but make sure the docker version is 1.6+.
+
+```
+$ docker --version
+Docker version 1.6.0, build 350a636/1.6.0
+```
+
+If docker is not 1.6 or higher then:
+
+```
+yum install -y docker
+```
+
+Now install the ceph-common library:
+
 ```
 $ yum install -y ceph-common
  
@@ -20,8 +35,6 @@ $ yum install -y ceph
 Pull ceph-docker and run all of the ceph processes inside a single Docker container:
 
 ```
-$ yum install -y docker
-
 $ docker pull ceph/demo
 #stash the image locally. At some point I will need to use the ceph/daemon image to
 #create the monitor, osd, and rgw as separate containers
