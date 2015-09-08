@@ -1,7 +1,7 @@
 ## How to Setup a Simple OpenShift Enterprise (OSE) Cluster
 
 ### Environment:
-The enviromnent used for all of the examples in this repo is described [here](../ENV.md).
+The enviromnent used for all of the examples in this repo is described [here](ENV.md).
 
 ### Setting up OSE:
 OpenShift is installed following the [OpenShift Admin Guide – quick installation](https://docs.openshift.com/enterprise/3.0/admin_guide/install/quick_install.html).
