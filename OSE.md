@@ -23,6 +23,15 @@ openshift-infra                  Active
 ### Ceph:
 Each schedulable OSE-node needs the ceph-common library installed, and due to a current ceph packaging bug, also needs full ceph installed.
 
+Note: in order to install the full ceph (which is currently needed due to a ceph packaging bug), each scheduable OSE node needs ceph repos enabled.
+
+```
+$ subscription-manager repos --enable=rhel-7-server-rpms --enable=rhel-7-server-rhceph-1.3-installer-rpms \
+      --enable=rhel-7-server-rhceph-1.3-mon-rpms --enable=rhel-7-server-rhceph-1.3-osd-rpms
+```
+
+Now install ceph:
+
 ```
 $ yum install -y ceph-common
 
