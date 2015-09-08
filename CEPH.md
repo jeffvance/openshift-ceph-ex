@@ -20,6 +20,8 @@ $ yum install -y ceph
 Pull ceph-docker and run all of the ceph processes inside a single Docker container:
 
 ```
+$ yum install -y docker
+
 $ docker pull ceph/demo
 #stash the image locally. At some point I will need to use the ceph/daemon image to
 #create the monitor, osd, and rgw as separate containers
