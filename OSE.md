@@ -56,7 +56,7 @@ privileged   true      []        true      RunAsAny   RunAsAny
 restricted   false     []        false     RunAsAny   RunAsAny
 ```
 
-### Additional Verification/Validation:
+### Verification/Validation:
 
 On the OSE master host:
 
