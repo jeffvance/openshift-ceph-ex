@@ -20,6 +20,16 @@ openshift                        Active
 openshift-infra                  Active
 ```
 
+### Ceph:
+Each schedulable OSE-node needs the ceph-common library installed, and due to a current ceph packaging bug, also needs full ceph installed.
+
+```
+$ yum install -y ceph-common
+
+#and due to ceph packaging bug where ceph-rbdnamed() is missing
+$ yum install -y ceph
+```
+
 ### Security:
 OSE Security Context Constraints (SCC) are described in [this OSE document](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html#security-context-constraints). The *privileged* and *restricted* SCCs are added as defaults by OSE and need to be modified in order for mysql and ceph to have sufficient privileges. See also [General OSE Authorization](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html).
 
@@ -40,6 +50,7 @@ restricted   false     []        false     RunAsAny   RunAsAny
 ### Additional Verification/Validation:
 
 On the OSE master host:
+
 ```
 $ systemctl status openshift-master -l
 openshift-master.service - OpenShift Master
@@ -56,7 +67,14 @@ Sep 04 00:46:02 rhel7-ose-1 openshift-master[49702]: I0904 00:46:02.803183   497
 Sep 04 00:46:03 rhel7-ose-1 openshift-master[49702]: I0904 00:46:03.001061   49702 controller.go:85] Ignoring DeploymentConfig change for default/docker-registry:2 (latestVersion=2); same as Deployment default/docker-registry-2
 ```
 
-On an OSE worker-node:
+On each OSE schedulable node:
+
+```
+$ rpm -qa|grep ceph
+ceph-common-0.94.1-16.el7cp.x86_64
+ceph-0.94.1-16.el7cp.x86_64
+```
+
 ```
 $ systemctl status openshift-node -l
 openshift-node.service - OpenShift Node
@@ -80,7 +98,7 @@ Sep 04 00:48:09 rhel7-ose-2 openshift-node[94526]: I0904 00:48:09.198268   94526
 Sep 04 00:48:09 rhel7-ose-2 openshift-node[94526]: I0904 00:48:09.202366   94526 status_manager.go:129] Ignoring same status for pod "mysql_default", status: {Phase:Running Conditions:[{Type:Ready Status:True}] Message: Reason: HostIP:192.168.122.254 PodIP:10.1.0.41 StartTime:2015-09-03 19:10:07.598461546 -0400 EDT ContainerStatuses:[{Name:mysql State:{Waiting:<nil> Running:0xc213e6d0c0 Terminated:<nil>} LastTerminationState:{Waiting:<nil> Running:<nil> Terminated:<nil>} Ready:true RestartCount:0 Image:mysql ImageID:docker://7eee2d462c8f6ffacfb908cc930559e21778f60afdb2d7e9cf0f3025274d7ea8 ContainerID:docker://77f4af567e3dd3b10656ad5ee38a39600174a87c519d6a23735e96cf0ee4208a}]}
 ```
 
-And some docker checks on the OSE worker-node:
+And some docker checks on the OSE node:
 
 ```
 $ docker ps   # make sure docker is running
