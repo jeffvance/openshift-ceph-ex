@@ -15,10 +15,19 @@ $ docker --version
 Docker version 1.6.0, build 350a636/1.6.0
 ```
 
-If docker is not 1.6 or higher then:
+On Fedora 21 there seems to be a problem with docker storage setup using docker version 1.8. So, if your docker version is 1.8 then you should:
 
 ```
-yum install -y docker
+$ yum --showduplicates  list | grep ^docker
+
+#if you see docker 1.6 or 1.7 then...
+$ yum install -y docker-1.6  #or docker-1.7
+```
+
+If docker is lower than 1.6 then:
+
+```
+yum install -y docker-1.6  #or docker-1.7
 ```
 
 Now install the ceph-common library:
