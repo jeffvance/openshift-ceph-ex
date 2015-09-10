@@ -25,7 +25,7 @@ Shell into the mysql container and run mysql:
 ```
 $ docker exec -it <mysql-container-ID> bash
 bash# mysql -p  # -p needed since a root password was supplied above
-mysql> show datbases;
+mysql> show databases;
 mysql> quit
 bash# exit
 ```
