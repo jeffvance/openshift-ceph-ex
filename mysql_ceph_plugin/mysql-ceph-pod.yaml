@@ -14,7 +14,7 @@ spec:
   volumes:
     - name: mysql-ceph
       rbd: 
-        monitors: 
+        monitors: #ip addr of the ceph AIO container's VM
           - 192.168.122.133:6789
         pool: rbd
         image: foo
