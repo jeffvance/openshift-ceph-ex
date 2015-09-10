@@ -33,5 +33,6 @@ bash# exit
 
 Delete the mysql container so we can create it from a pod or re-run docker to create it later:
 ```
+$ docker stop <mysql-container-ID>
 $ docker rm <mysql-container-ID>
 ```
