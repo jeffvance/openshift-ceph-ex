@@ -15,6 +15,7 @@ Note: if you re-run the above you will first need to remove the archived contain
 
 ```
 $ docker ps -a
+$ docker stop <mysql-container-ID>
 $ docker rm <mysql-container-ID>
 
 # to remove all containers:
