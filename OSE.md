@@ -101,7 +101,17 @@ Sep 04 00:46:02 rhel7-ose-1 openshift-master[49702]: I0904 00:46:02.803183   497
 Sep 04 00:46:03 rhel7-ose-1 openshift-master[49702]: I0904 00:46:03.001061   49702 controller.go:85] Ignoring DeploymentConfig change for default/docker-registry:2 (latestVersion=2); same as Deployment default/docker-registry-2
 ```
 
-On each OSE schedulable node:
+And, still on the OSE-master:
+
+```
+$ oc get nodes
+NAME              LABELS                                   STATUS
+192.168.122.179   kubernetes.io/hostname=192.168.122.179   Ready,SchedulingDisabled
+192.168.122.254   kubernetes.io/hostname=192.168.122.254   Ready
+
+```
+
+On *each* OSE schedulable node:
 
 ```
 $ rpm -qa|grep ceph
