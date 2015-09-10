@@ -102,4 +102,16 @@ QVFEdmE3SlZFdVZKQkJBQWM4ZTFaQldocVVCOUsvek5aZE9Ib1E9PQo=
 See the [OSE setup readme](OSE.md) for details on how to use this required feature.
 
 ### Firewall:
-Port 6789 needs to be open. An iptables rule accomplishes this, or iptables rules can be flushed (*iptables -F*), or firewalld can be stopped (*systemctl stop firewalld*).
+Port 6789 needs to be reachable. An iptables rule accomplishes this, or iptables rules can be flushed (*iptables -F*), or firewalld can be stopped (*systemctl stop firewalld*).
+
+On the ceph host, see if port 6789 is reachable (i.e., not blocked by the firewall):
+
+```
+# assume gateway ip on the ceph host is 192.168.122.133
+$ nc 192.168.122.133 6789 </dev/null
+$ echo $?  #must be 0
+ 
+#or
+$ telnet 192.168.122.133 6789
+# error if refused, else CTRL-C to exit telnet
+```
