@@ -39,6 +39,31 @@ $ yum install -y ceph-common
 $ yum install -y ceph
 ```
 
+### Ceph Secret:
+The ceph-rbd storage plugin uses a ceph secret for authorization. This is a short yaml file which resides on the OSE-master host but gets its value from the ceph monitor host. See also the the [ceph readme](CEPH.md):
+
+```
+#on the ceph monitor host (or the AIO ceph container's VM):
+$ ceph auth get-key client.admin
+AQDva7JVEuVJBBAAc8e1ZBWhqUB9K/zNZdOHoQ==
+
+$ echo "AQDva7JVEuVJBBAAc8e1ZBWhqUB9K/zNZdOHoQ=="| base64
+QVFEdmE3SlZFdVZKQkJBQWM4ZTFaQldocVVCOUsvek5aZE9Ib1E9PQo=
+# copy the above output
+```
+
+Back on the OSE-master node, edit the [ceph-secret file](ceph-secret.yaml) pasting the base64 value above. Then *oc create* the ceph-secret object:
+
+```
+$ oc create -f ceph-secret.yaml 
+secrets/ceph-secret
+ 
+$ oc get secret
+NAME                  TYPE                                  DATA
+ceph-secret           Opaque                                1
+...
+```
+
 ### Security:
 OSE Security Context Constraints (SCC) are described in [this OSE document](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html#security-context-constraints). The *privileged* and *restricted* SCCs are added as defaults by OSE and need to be modified in order for mysql and ceph to have sufficient privileges. See also [General OSE Authorization](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html).
 
