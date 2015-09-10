@@ -3,11 +3,9 @@
 Here is an example of how to set up and run ceph-rbd in a single container. .
 
 ### Environment:
-The enviromnent used for all of the examples in this repo is described [here](ENV.md).
+The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which shows up as */dev/vdb*. Install ceph-common (client libraries) so that the OSE pod running mysql can do the ceph RBD mount .
 
-### Ceph:
-A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which shows up as */dev/vdb*. Install ceph-common (client libraries) so that the OSE pod running mysql can do the ceph RBD mount .
-
+### Docker:
 Fedora 21 has docker pre-installed but make sure the docker version is 1.6+.
 
 ```
@@ -41,9 +39,23 @@ $ yum install -y ceph-common
 $ yum install -y ceph
 ```
 
-Pull ceph-docker and run all of the ceph processes inside a single Docker container:
+### SELinux:
+The goal, of course, is to be able to run ceph with selinux set to enforcing. However, ceph/demo does not start until selinux is set to permissive. Eg:
 
 ```
+$ docker run --net=host -v /etc/ceph:/etc/ceph -v /var/lib/ceph:/var/lib/ceph \
+     -e MON_IP=192.168.122.133 -e CEPH_NETWORK=192.168.122.0/24 ceph/demo 
+creating /tmp/ceph.mon.keyring
+importing contents of /etc/ceph/ceph.client.admin.keyring into /tmp/ceph.mon.keyring
+mkdir: cannot create directory '/var/lib/ceph/mon/ceph-ceph-f21-deploy': Permission denied
+```
+
+### Ceph/demo:
+After setting selinux to permissive mode the ceph/demo AIO container can be run. Pull ceph/demo and run all of the ceph processes inside an all-in-one (AIO) Docker container:
+
+```
+$ setenforce 0
+
 $ docker pull ceph/demo
 #stash the image locally. At some point I will need to use the ceph/daemon image to
 #create the monitor, osd, and rgw as separate containers
