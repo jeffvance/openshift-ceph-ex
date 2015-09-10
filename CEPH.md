@@ -115,3 +115,6 @@ $ echo $?  #must be 0
 $ telnet 192.168.122.133 6789
 # error if refused, else CTRL-C to exit telnet
 ```
+
+### Additional information:
+Additional information can be found in the [ceph documentation](http://ceph.com/docs/master/start/quick-rbd/).
