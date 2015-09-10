@@ -100,3 +100,6 @@ QVFEdmE3SlZFdVZKQkJBQWM4ZTFaQldocVVCOUsvek5aZE9Ib1E9PQo=
 ```
 
 See the [OSE setup readme](OSE.md) for details on how to use this required feature.
+
+### Firewall:
+Port 6789 needs to be open. An iptables rule accomplishes this, or iptables rules can be flushed (*iptables -F*), or firewalld can be stopped (*systemctl stop firewalld*).
