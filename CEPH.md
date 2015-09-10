@@ -86,25 +86,17 @@ $ rbd --image foo -p rbd info
 ```
 
 ### Ceph Secret:
-The ceph-rbd storage plugin uses a ceph secret for authorization. This is a short yaml file created as follows, on the ceph monitor host:
+The ceph-rbd storage plugin uses a ceph secret for authorization. This is a simple yaml file residing on the OSE-master host. The encoded secret value is generated on the ceph host, as follows:
 
 ```
+#on the ceph monitor host (or the AIO ceph container's VM):
 $ ceph auth get-key client.admin
 AQDva7JVEuVJBBAAc8e1ZBWhqUB9K/zNZdOHoQ==
 
+#copy the above value and paste it in the echo command below:
 $ echo "AQDva7JVEuVJBBAAc8e1ZBWhqUB9K/zNZdOHoQ=="| base64
 QVFEdmE3SlZFdVZKQkJBQWM4ZTFaQldocVVCOUsvek5aZE9Ib1E9PQo=
-# copy the above output
+# copy the above base64 output
 ```
 
-Create the [ceph-secret file](ceph-secret.yaml):
-
-```
-$ oc create -f ceph-secret.yaml 
-secrets/ceph-secret
- 
-$ oc get secret
-NAME                  TYPE                                  DATA
-ceph-secret           Opaque                                1
-...
-```
+See the [OSE setup readme](OSE.md) for details on how to use this required feature.
