@@ -46,7 +46,7 @@ After logging-in to OSE as the *admin* user, edit the two SCC files, as shown be
 
 ```
 $ oc login -u admin
-$ oc edit scc prvilege
+$ oc edit scc privilege
 $ oc edit scc restricted
 #change "MustRunAsRange" to "RunAsAny"
 
