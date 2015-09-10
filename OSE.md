@@ -40,7 +40,7 @@ $ yum install -y ceph
 ```
 
 ### Ceph Secret:
-The ceph-rbd storage plugin uses a ceph secret for authorization. This is a short yaml file which resides on the OSE-master host but gets its value from the ceph monitor host. See also the the [ceph readme](CEPH.md):
+The ceph-rbd storage plugin uses a ceph secret for authorization. This is a short yaml file which resides on the OSE-master host but gets its value from the ceph monitor host. See also the [ceph readme](CEPH.md):
 
 ```
 #on the ceph monitor host (or the AIO ceph container's VM):
