@@ -15,7 +15,7 @@ $ docker --version
 Docker version 1.6.0, build 350a636/1.6.0
 ```
 
-On Fedora 21 there seems to be a problem with docker storage setup using docker version 1.8. So, if your docker version is 1.8 then you should:
+On Fedora 21 there seems to be a docker 1.8 problem with storage setup where the docker-metapool is too small. So, if your docker version is 1.8 then you should consider:
 
 ```
 $ yum --showduplicates  list | grep ^docker
