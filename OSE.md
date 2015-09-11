@@ -11,7 +11,7 @@ To consider OSE installed and working the OSE master server must be running, all
 ```
 $ oc login -u admin
 Password:
-Using project "default".
+Using project "default"
 
 $ oc get projects
 NAME              DISPLAY NAME   STATUS
@@ -65,7 +65,7 @@ ceph-secret           Opaque                                1
 ```
 
 ### Security:
-OSE Security Context Constraints (SCC) are described in [this OSE document](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html#security-context-constraints). The *privileged* and *restricted* SCCs are added as defaults by OSE and need to be modified in order for mysql and ceph to have sufficient privileges. See also [General OSE Authorization](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html).
+OSE Security Context Constraints (SCC) are described in this [OSE document](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html#security-context-constraints). The *privileged* and *restricted* SCCs are added as defaults by OSE and need to be modified in order for mysql and ceph to have sufficient privileges. See also [General OSE Authorization](https://docs.openshift.com/enterprise/3.0/architecture/additional_concepts/authorization.html).
 
 After logging-in to OSE as the *admin* user, edit the two SCC files, as shown below:
 
@@ -80,6 +80,9 @@ NAME         PRIV      CAPS      HOSTDIR   SELINUX    RUNASUSER
 privileged   true      []        true      RunAsAny   RunAsAny
 restricted   false     []        false     RunAsAny   RunAsAny
 ```
+
+### MySQL:
+For each OSE-node see the [setting up mysql doc](MYSQL.md), and remember to execute the *chcon* command mentioned there.
 
 ### Verification/Validation:
 
@@ -156,7 +159,9 @@ $ systemctl status docker -l
 *journalctl* and *systemctl status* are the main ways to view OSE log files. The *systemctl status* command is shown above. Here are some *journalctl* examples:
 
 ```
-$ journalctl -xe -u openshift-master  # and on the OSE node:
+$ journalctl -xe -u openshift-master
+
+#and on the OSE node:
 $ journalctl -xe -u openshift-node
 ```
 
