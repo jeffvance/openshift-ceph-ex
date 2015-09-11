@@ -46,7 +46,7 @@ $ docker rm <mysql-container-ID>
 Before we can create a mysql pod we need to first set the selinux context on *each* schedulable OSE worker-node's /opt/mysql directory. This will grant mysql access to the files it needs. Note: selinux should remain enabled/enforcing:
 
 ```
-#on each scheduleable OSE-node:
+#on each schedulable OSE-node:
 $ chcon -Rt svirt_sandbox_file_t /opt/mysql
 
 $ ls -dZ /opt/mysql
