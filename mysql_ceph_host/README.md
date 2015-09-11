@@ -10,26 +10,10 @@ The steps needed to setup a simple OSE cluster with 1 master and 1 worker node a
 ### Setting up MySQL:
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
-### Defining the Pod Spec File:
-The [pod spec](mysql.yaml) uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides. Before we can create this pod we need to set the selinux context on each OSE host's directory (/opt/mysql) where the mysql pod can be scheduled. This will grant mysql access to the files it needs. The step is repeated on each scheduleable OSE node since the pod could land at any of these hosts. Note: selinux should remain enabled/enforcing:
+### Mysql Pod Spec File:
+The [pod spec](mysql.yaml) uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides. Before we can create this pod we need to [set the selinux context](../MYSQL.md) for the /opt/mysql directory on each schedualable OSE-node.
 
-```
-# on the OSE master host:
-$ oc get nodes
-NAME              LABELS                                   STATUS
-192.168.122.179   kubernetes.io/hostname=192.168.122.179   Ready,SchedulingDisabled
-192.168.122.254   kubernetes.io/hostname=192.168.122.254   Ready
-
-# on each scheduleable OSE node:
-$ chcon -Rt svirt_sandbox_file_t /opt/mysql
-$ ls -dZ /opt/mysql
-drwxr-xr-x. polkitd ssh_keys system_u:object_r:svirt_sandbox_file_t:s0 /opt/mysql
-
-$ getenforce
-Enforcing  # correct value
-```
-
-Now we can create the mysql pod:
+Create the mysql pod:
 
 ```
 $ oc create -f mysql.yaml 
@@ -84,8 +68,7 @@ CONTAINER ID        IMAGE                         COMMAND                CREATED
 dca749fa3530        openshift3/ose-pod:v3.0.1.0   "/pod"                 5 minutes ago       Up 5 minutes                            k8s_POD.892ec37e_mysql_default_ea9b64de-5290-11e5-b56b-52540039f12e_aa534a81
 
 $ docker inspect mysql
-[
-{
+[{
     "Id": "7eee2d462c8f6ffacfb908cc930559e21778f60afdb2d7e9cf0f3025274d7ea8",
 ...
     "ContainerConfig": {
