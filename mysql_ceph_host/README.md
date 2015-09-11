@@ -13,7 +13,7 @@ Follow the instructions [here](../MYSQL.md) to initialize and validate container
 ### Mysql Pod Spec File:
 The [pod spec](mysql.yaml) uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides. Before we can create this pod we need to [set the selinux context (#security)](../MYSQL.md) for the /opt/mysql directory on each schedulable OSE-node.
 
-Create the mysql pod:
+Now, create the mysql pod:
 
 ```
 $ oc create -f mysql.yaml 
