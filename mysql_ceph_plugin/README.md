@@ -16,7 +16,7 @@ Follow the instructions [here](../MYSQL.md) to initialize and validate container
 ### Defining the Pod Spec File:
 We're using a simple [pod spec](mysql-ceph-pod.yaml) which uses the same mysql image, defines the password as an environment variable, maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides, and specifies the ceph monitor's ip address (which is the ip address of the ceph AIO container's host VM). Before we can create this pod we need to [set the selinux context (#security)](../MYSQL.md) for the /opt/mysql directory on each schedulable OSE-node.
 
-Create the mysql pod:
+Now, create the mysql pod:
 
 ```
 $ oc create -f mysql-ceph-pod.yaml 
