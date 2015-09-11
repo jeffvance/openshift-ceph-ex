@@ -14,20 +14,9 @@ The steps needed to setup ceph in a single container (AIO, all-in-one container)
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Defining the Pod Spec File:
-We're using a simple [pod spec](mysql-ceph-pod.yaml) which uses the same mysql image, defines the password as an environment variable, maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides, and specifies the ceph monitor's ip address (which is the ip address of the ceph AIO container's host VM).
+We're using a simple [pod spec](mysql-ceph-pod.yaml) which uses the same mysql image, defines the password as an environment variable, maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides, and specifies the ceph monitor's ip address (which is the ip address of the ceph AIO container's host VM). Before we can create this pod we need to [set the selinux context (#security)](../MYSQL.md) for the /opt/mysql directory on each schedulable OSE-node.
 
-But before we can create this pod we need to set the selinux context on each schedulable OSE host's directory (/opt/mysql) where the database lives. Selinux should remain enabled/enforcing on all hosts:
-
-```
-$ chcon -Rt svirt_sandbox_file_t /opt/mysql
-$ ls -dZ /opt/mysql
-drwxr-xr-x. polkitd ssh_keys system_u:object_r:svirt_sandbox_file_t:s0 /opt/mysql
-
-$ getenforce
-Enforcing
-```
-
-Now we can create the mysql pod:
+Create the mysql pod:
 
 ```
 $ oc create -f mysql-ceph-pod.yaml 
