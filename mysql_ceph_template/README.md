@@ -67,8 +67,8 @@ ceph-pv              <none>    2147483648   RWX           Available
 ```
 The pv file used above is defined [here](../mysql_ceph_pvc/ceph-pv.yaml).
 
-### Instantiate the Mysql Pod:
-The *oc new-app* command accepts a template object (or a template file can be specified) and creates the mysql app from this template.
+### Create the Mysql Pod:
+Before we can create the mysql pod (from the template), we need to [set the selinux context (#security)](../MYSQL.md) for the /opt/mysql directory on each schedulable OSE-node. After that, the *oc new-app* command, which accepts a template object (or a template file can be specified), is used to create the mysql app from this template:
 
 ```
 $ oc new-app ceph-mysql-template
