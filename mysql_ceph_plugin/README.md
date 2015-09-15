@@ -14,9 +14,9 @@ The steps needed to setup ceph in a single container (AIO, all-in-one container)
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Defining the Pod Spec File:
-We're using a simple [pod spec](mysql-ceph-pod.yaml) which uses the same mysql image, maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides, and specifies the ceph monitor's ip address (which is the ip address of the ceph AIO container's host VM). Additionally, the pod created by this spec will be **privileged**. This is necessary for the rbd mount to succeed. An alternative is to set selinux to permissive mode (*setenforce 0*) on *all* schedulable ose-nodes; however, running the mysql container privileged is likely preferred.  Before we can create this pod we need to [set the selinux context (#security)](../MYSQL.md) for the /opt/mysql directory on each schedulable OSE-node.
+We're using a simple [pod spec](mysql-ceph-pod.yaml) which uses the same mysql image, defines a container volume mount that references the ceph-rbd persistent storage plugin, and specifies the ceph monitor's ip address (which is the ip address of the ceph AIO container's host VM). Additionally, the pod created by this spec needs to be **privileged**. This is necessary for the rbd mount to succeed. An alternative is to set selinux to permissive mode (*setenforce 0*) on *all* schedulable ose-nodes; however, running the mysql container privileged is likely preferred.
 
-Now, create the mysql pod:
+Create the mysql pod:
 
 ```
 $ oc create -f mysql-ceph-pod.yaml 
