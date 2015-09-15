@@ -15,7 +15,7 @@ The steps needed to setup ceph in a single container (AIO, all-in-one container)
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Defining the Template File:
-Here is the [template file](ceph-mysql-template.yaml) which defines both the persistent volume claim (PVC) and the pod. The actual persistent volume (PV) has already been created in [example 3](../mysql_ceph_pvc), and is verified here. As in the other examples, the mysql pod/container needs to run privileged, and this is set in the container spec portion of the template.
+Here is the [template file](ceph-mysql-template.yaml) which defines both the persistent volume claim (PVC) and the pod. The actual persistent volume (PV) has already been created in [example 3](../mysql_ceph_pvc), and is verified here. Note, as in the other examples, the mysql pod/container needs to run privileged, and this is set in the container spec portion of the template.
 
 ```
 $ oc get pv
