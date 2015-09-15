@@ -43,15 +43,43 @@ $ docker rm <mysql-container-ID>
 ```
 
 ### Security:
-Before we can create a mysql pod we need to first set the selinux context on *each* schedulable OSE worker-node's /opt/mysql directory. This will grant mysql access to the files it needs. Note: selinux should remain enabled/enforcing:
+If the mysql container is not privileged then it will fail with this error:
 
 ```
-#on each schedulable OSE-node:
+chown: cannot read directory `/var/lib/mysql/': Permission denied
+```
+
+The above error is found by looking at the docker logs on the target OSE-node:
+
+```
+$ docker ps -a  #need -a since the container start fails
+$ docker logs <mysql-id>
+```
+
+Even setting the selinxu context for /opt/mysql on the OSE-node does not fix the issue. Eg. doing this:
+
+```
 $ chcon -Rt svirt_sandbox_file_t /opt/mysql
-
-$ ls -dZ /opt/mysql
-drwxr-xr-x. polkitd ssh_keys system_u:object_r:svirt_sandbox_file_t:s0 /opt/mysql
-
-$ getenforce
-Enforcing  #correct value
 ```
+still fails with the same permissions error.
+
+The only solution that seems to allow the mysql container to start correctly is to set the mysql pod to be privileged, which is done with the yaml fragment:
+
+```
+spec:
+  containers:
+    - image: mysql
+     ...
+      securityContext:
+        capabilities: {}
+        privileged: true
+```
+
+Note that selinux remains enabled/enforcing.
+
+```
+$ getenforce
+Enforcing
+```
+
+
