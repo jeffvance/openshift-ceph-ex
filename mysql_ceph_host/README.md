@@ -11,9 +11,9 @@ The steps needed to setup a simple OSE cluster with 1 master and 1 worker node a
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Mysql Pod Spec File:
-The [pod spec](mysql.yaml) uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides. Before we can create this pod we need to [set the selinux context (#security)](../MYSQL.md) for the /opt/mysql directory on each schedulable OSE-node.
+The [pod spec](mysql.yaml) uses a mysql image, defines the password as an environment variable, and maps the container's volume (/var/lib/mysql) to the host's volume (/opt/mysql) where the database resides.
 
-Now, create the mysql pod:
+Create the mysql pod via *oc create*:
 
 ```
 $ oc create -f mysql.yaml 
