@@ -56,7 +56,7 @@ $ docker ps -a  #need -a since the container start fails
 $ docker logs <mysql-id>
 ```
 
-Even setting the selinxu context for /opt/mysql on the OSE-node does not fix the issue. Eg. doing this:
+Even setting the selinxu context for /opt/mysql (which is the host directory being bound to /var/lib/mysql inside the container) on the OSE-node does not fix the issue. Eg. doing this:
 
 ```
 $ chcon -Rt svirt_sandbox_file_t /opt/mysql
