@@ -13,6 +13,9 @@ spec:
       volumeMounts: 
         - name: mysql-pv
           mountPath: /var/lib/mysql
+      securityContext:
+        capabilities: {}
+        privileged: true #privileged required for the rbd mount
   volumes: 
     - name: mysql-pv
       persistentVolumeClaim:
