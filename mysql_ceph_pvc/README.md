@@ -41,7 +41,7 @@ ceph-claim      map[]     Bound     ceph-pv
 Notice that the claim has been bound to the "ceph-pv" persistent volume.
 
 ### Creating the Pod:
-The [pod spec](ceph-mysql-pvc-pod.yaml) references the same mysql image and defines the named claim to be used for persistent storage. But, before we can create this pod we need to [set the selinux context (#security)](../MYSQL.md) for the /opt/mysql directory on each schedulable OSE-node. Next, *oc create* is used to create the pod:
+The [pod spec](ceph-mysql-pvc-pod.yaml) references the same mysql image and defines the named claim to be used for persistent storage. As with [example 2](../mysql_ceph_plugin), the mysql container needs to run privileged. *oc create* is used to create the pod:
 
 ```
 $ oc create -f ceph-mysql-pvc-pod.yaml 
