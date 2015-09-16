@@ -6,7 +6,7 @@ The enviromnent used for all of the examples in this repo is described [here](EN
 ### Setting up OSE:
 OpenShift is installed following the [OpenShift Admin Guide – quick installation](https://docs.openshift.com/enterprise/3.0/admin_guide/install/quick_install.html).
 
-To consider OSE installed and working the OSE master server must be running, all OSE worker-nodes are running, you are able to login to the OpenShift Console via the GUI - https://master-host:8443/console), you have access to the OSE *oc* command, and you can login to the console, eg:
+To consider OSE installed and working the OSE master server must be running, all OSE worker-nodes are running, you are able to login to the OpenShift Console via the GUI (https://master-host:8443/console), you have access to the OSE *oc* command, and you can login to the console, eg:
 
 ```
 $ oc login -u admin
