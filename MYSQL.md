@@ -5,10 +5,11 @@ First, OSE's Security Context Constraints (SSC) need to be defined such that the
 Our mysql example uses the official mysql image found [here](https://hub.docker.com/_/mysql/). First, pull down the image on *each* of your OSE worker nodes:
 
 ```
-docker pull mysql
+#on *each* OSE-node:
+$ docker pull mysql
 ```
 
-Next, test to ensure that mysql can be run from a containers:
+Next, test to ensure that mysql can be run in a container:
 
 ```
 $ docker run --name mysql -e MYSQL_ROOT_PASSWORD=foopass -d mysql
@@ -35,7 +36,7 @@ mysql> quit
 bash# exit
 ```
 
-Delete the mysql container so we can create it from a pod or re-run docker to create it later:
+Delete the mysql container so we can create it from a pod later:
 
 ```
 $ docker stop <mysql-container-ID>
@@ -56,14 +57,14 @@ $ docker ps -a  #need -a since the container start fails
 $ docker logs <mysql-id>
 ```
 
-Even setting the selinxu context for /opt/mysql (which is the host directory being bound to /var/lib/mysql inside the container) on the OSE-node does not fix the issue. Eg. doing this:
+Even setting the selinxu context for /opt/mysql (which is the host directory being bound to /var/lib/mysql inside the container) on the OSE-node does not fix the issue. Eg., on the OSE-node:
 
 ```
 $ chcon -Rt svirt_sandbox_file_t /opt/mysql
 ```
 still fails with the same permissions error.
 
-The only solution that seems to allow the mysql container to start correctly is to set the mysql pod to be privileged, which is done with the yaml fragment:
+The only solution that seems to allow the mysql container to start correctly is to set the mysql pod to be privileged, which is done with this yaml fragment:
 
 ```
 spec:
