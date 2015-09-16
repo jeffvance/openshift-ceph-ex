@@ -3,7 +3,7 @@
 Here is an example of how to set up and run ceph-rbd in a single container. .
 
 ### Environment:
-The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which, when using kvm, shows up as */dev/vdb*.
+The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM is used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which, when using kvm, shows up as */dev/vdb*.
 
 Below we show docker considerations, how to install ceph-common (client libraries), security and authorization suggestions, so that the OSE pod running mysql can do the ceph RBD mount.
 
@@ -41,8 +41,10 @@ $ yum install -y ceph-common
 $ yum install -y ceph
 ```
 
-### SELinux:
-The goal, of course, is to be able to run ceph with selinux set to enforcing. However, ceph/demo does not start until selinux is set to permissive. Eg:
+### SELinux and Security:
+Though the customer will determine ceph access policies, for the purpose of getting mysql persisted on ceph via openshift, we have left the ceph host vm wide open. So, selinux is set to permissive (*setenforce 0*), iptables rules have been flushed (*iptables -F*), and firewalld is stopped (*systemctl stop firewalld*).
+
+If, for example, selinux is set to enforcing (default) then the ceph/demo container will not start: 
 
 ```
 $ docker run --net=host -v /etc/ceph:/etc/ceph -v /var/lib/ceph:/var/lib/ceph \
@@ -50,6 +52,33 @@ $ docker run --net=host -v /etc/ceph:/etc/ceph -v /var/lib/ceph:/var/lib/ceph \
 creating /tmp/ceph.mon.keyring
 importing contents of /etc/ceph/ceph.client.admin.keyring into /tmp/ceph.mon.keyring
 mkdir: cannot create directory '/var/lib/ceph/mon/ceph-ceph-f21-deploy': Permission denied
+```
+
+It is likely that certain selinux context labels can be set (see the *chcon* and *semanage* commands) but that is not the purpose of this repo, therefore, the ceph vm is wide open. A note about *semanage* on f21:
+```
+semanage is not part of the installed f21 utilities so it has to be installed independently.
+To find the package containing selinux:
+   $ yum provides /usr/sbin/semanage
+   # yum provides /usr/sbin/semanage
+   Loaded plugins: langpacks
+   policycoreutils-python-2.3-7.1.fc21.x86_64 : SELinux policy core python
+                                           : utilities
+   Repo        : fedora
+   Matched from:
+   Filename    : /usr/sbin/semanage
+
+   policycoreutils-python-2.3-8.fc21.x86_64 : SELinux policy core python utilities
+   Repo        : updates
+   Matched from:
+   Filename    : /usr/sbin/semanage
+   ...
+
+So, policycoreutils-python contains semanage:
+   $ yum -y install policycoreutils-python
+
+Then semanage can be used to allow contexts to run.
+For example, to allow nginx to have access to it's /usr/share/nginx/* files, simply do:
+   $ semanage permissive -a httpd_t
 ```
 
 ### Ceph/demo:
