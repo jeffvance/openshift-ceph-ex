@@ -3,10 +3,12 @@
 Here is an example of how to set up and run ceph-rbd in a single container. .
 
 ### Environment:
-The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which, when using kvm, shows up as */dev/vdb*. Install ceph-common (client libraries) so that the OSE pod running mysql can do the ceph RBD mount .
+The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which, when using kvm, shows up as */dev/vdb*.
+
+Below we show docker considerations, how to install ceph-common (client libraries), security and authorization suggestions, so that the OSE pod running mysql can do the ceph RBD mount.
 
 ### Docker:
-Fedora 21 has docker pre-installed but make sure the docker version is 1.6+.
+Fedora 21 has docker pre-installed but make sure the docker version is 1.6 or 1.7 -- not 1.8.
 
 ```
 $ docker --version
@@ -51,7 +53,7 @@ mkdir: cannot create directory '/var/lib/ceph/mon/ceph-ceph-f21-deploy': Permiss
 ```
 
 ### Ceph/demo:
-After setting selinux to permissive mode the ceph/demo AIO container can be run. Pull ceph/demo and run all of the ceph processes inside an all-in-one (AIO) Docker container:
+After setting selinux to permissive mode (*setenforce 0*) the ceph/demo AIO container can be run. Pull ceph/demo and run all of the ceph processes inside an all-in-one (AIO) Docker container:
 
 ```
 $ setenforce 0
@@ -127,6 +129,8 @@ $ echo $?  #must be 0
 $ telnet 192.168.122.133 6789
 # error if refused, else CTRL-C to exit telnet
 ```
+
+Repeat the above *telnet* or *nc* commands on some (or all) of the OSE-nodes to test that whichever node the mysql container is scheduled on is capable of reaching the ceph AIO's container's host node.
 
 ### Additional information:
 Additional information can be found in the [ceph documentation](http://ceph.com/docs/master/start/quick-rbd/).
