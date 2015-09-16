@@ -3,7 +3,7 @@
 Here is an example of how to set up and run ceph-rbd in a single container. .
 
 ### Environment:
-The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which shows up as */dev/vdb*. Install ceph-common (client libraries) so that the OSE pod running mysql can do the ceph RBD mount .
+The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM was used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which, when using kvm, shows up as */dev/vdb*. Install ceph-common (client libraries) so that the OSE pod running mysql can do the ceph RBD mount .
 
 ### Docker:
 Fedora 21 has docker pre-installed but make sure the docker version is 1.6+.
