@@ -26,14 +26,26 @@ $ docker rm <mysql-container-ID>
 $ docker rm $(docker ps -a)
 ```
 
-Shell into the mysql container and run mysql:
+Shell into the mysql container and run mysql -p:
 
 ```
 $ docker exec -it <mysql-container-ID> bash
-bash# mysql -p  # -p needed since a root password was supplied above
+bash# mysql -p
 mysql> show databases;
 mysql> quit
 bash# exit
+```
+
+Note: *-p* causes mysql to prompt for the user's password, even if the password has been provided via the MYSQL_ROOT_PASSWORD env variable. In some cases, as seen here, *-p* is required for the mysql command to succeed. Omitting *-p* in this case causes the error below:
+
+```
+#On the host running the mysql container we see the password is provided:
+$ docker inspect 9501299ac215 | grep PASSWORD
+            "MYSQL_ROOT_PASSWORD=foopass",
+            
+#inside the mysql container we get an error unless we use -p and supply the password:
+root@mysql:/# mysql  #no -p
+ERROR 1045 (28000): Access denied for user 'root'@'localhost' (using password: NO)
 ```
 
 Delete the mysql container so we can create it from a pod later:
