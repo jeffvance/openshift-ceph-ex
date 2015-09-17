@@ -2,10 +2,10 @@
 
 This repo contains examples showing how to run MySQL in the following environments:
   1. in a container launched directly from docker (see the [mysql readme](MYSQL.md))
-  2. via an openshift/kubernetes pod (examples [2](mysql_ceph_pvc) and [3](mysql_ceph_pvc))
+  2. via an openshift/kubernetes pod (examples [2](mysql_ceph_host) and [3](mysql_ceph_pvc))
   3. via an openshift application template (example [4](mysql_ceph_template)).
 
-We'll use both local host storage ([hostPath](mysql_ceph_plugin)) and [ceph-rbd block storage](mysql_ceph_pvc) under an ext4 file system to persist the database.
+We'll use both [local OSE-node storage](mysql_ceph_host) and [ceph-rbd block storage](mysql_ceph_plugin) under an ext4 file system to persist the database.
 
 The next few sections are common across almost all of the examples and are also shown below:
 
