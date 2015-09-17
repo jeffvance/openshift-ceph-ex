@@ -60,7 +60,7 @@ Events:
   Thu, 03 Sep 2015 19:10:15 -0400	Thu, 03 Sep 2015 19:10:15 -0400	1	{kubelet 192.168.122.254}	spec.containers{mysql}			startedStarted with docker id 77f4af567e3d
 ```
 
-On the target OSE host run docker to get information about the mysql container:
+On the target OSE-node use docker to get information about the mysql container:
 
 ```
 $ docker ps
@@ -185,10 +185,10 @@ $ docker logs 77f4af567e3d   # <--- container ID
 Version: '5.6.26'  socket: '/var/run/mysqld/mysqld.sock'  port: 3306  MySQL Community Server (GPL)
 ```
 
-Finally, run mysql inside the container:
+Finally, on the same OSE-node, run mysql inside the container:
 
 ```
-$ docker exec -it 77f4af567e3d bash  # <--- container ID again
+$ docker exec -it 77f4af567e3d bash  # <--- mysql container ID
 root@mysql:/# mysql -p
 Enter password: 
 Welcome to the MySQL monitor.  Commands end with ; or \g.
