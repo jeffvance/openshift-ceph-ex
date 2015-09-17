@@ -16,9 +16,10 @@ Follow the instructions [here](../MYSQL.md) to initialize and validate container
 ### Defining the Pod Spec File:
 We're using a simple [pod spec](mysql-ceph-pod.yaml) which uses the same mysql image, defines a container volume mount that references the ceph-rbd persistent storage plugin, and specifies the ceph monitor's ip address (which is the ip address of the ceph AIO container's host VM). Additionally, the pod created by this spec needs to be **privileged**, as seen in the container's "securityContext" spec. This is necessary for the rbd mount to succeed. An alternative is to set selinux to permissive mode (*setenforce 0*) on *all* schedulable ose-nodes; however, running the mysql container privileged is likely preferred.
 
-Create the mysql pod:
+On the OSE-master, create the mysql pod:
 
 ```
+#on the OSE-master:
 $ oc create -f mysql-ceph-pod.yaml 
 pods/mysql
 
@@ -30,6 +31,7 @@ mysql                     1/1       Running         0          18s
 To see which OSE host the mysql pod has been scheduled on:
 
 ```
+#on the OSE-master:
 $ oc describe pod mysql
 Name:				mysql
 Namespace:	default
