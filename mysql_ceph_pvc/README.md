@@ -20,9 +20,10 @@ A persistent volume is created from a file defining the name, capacity, and acce
 PVs are typically created by an OSE administrator, whereas PVCs will typically be created and requested by non-admins. The example here creates both the PV and claim separate from the pod. There is also a [template](../mysql_ceph_template) example which defines the PVC in the same file used to define the pod.
 
 ### Creating the PV and PVC:
-*oc create -f* is used to create almost all OSE objects and is used here to create the ceph PV and PVC.
+*oc create -f* is execute on the OSE-master to create almost all OSE objects and is used here to create the ceph PV and PVC.
 
 ```
+#on the OSE-master:
 $ oc create -f ceph-pv.yaml
 persistentvolumes/ceph-pv
 
@@ -44,6 +45,7 @@ Notice that the claim has been bound to the "ceph-pv" persistent volume.
 The [pod spec](ceph-mysql-pvc-pod.yaml) references the same mysql image and defines the named claim to be used for persistent storage. As with [example 2](../mysql_ceph_plugin), the mysql container needs to run privileged. *oc create* is used to create the pod:
 
 ```
+#on the OSE-master:
 $ oc create -f ceph-mysql-pvc-pod.yaml 
 pods/ceph-mysql
 
@@ -55,6 +57,7 @@ ceph-mysql                1/1       Running
 We see above that the "ceph-mysql" pod is running. We can use *oc describe pod* to see which OSE host the pod is running on, and to see the pod's recent events:
 
 ```
+#on the OSE-master:
 $ oc describe pod ceph-mysql
 Name:				ceph-mysql
 Namespace:			default
@@ -89,6 +92,7 @@ Events:
 We see that the pod was scheduled on OSE host 192.168.122.254 (often there is a hostname visible too). On the target OSE node verify that the mysql container is running and that it's using the ceph-rbd volume:
 
 ```
+#on the target/scheduled OSE-node:
 $ docker ps
 CONTAINER ID        IMAGE                         COMMAND                CREATED             STATUS              PORTS               NAMES
 9a43017dbebf        mysql                         "/entrypoint.sh mysq   4 minutes ago       Up 4 minutes                            k8s_ceph-mysql.d8cb6e3e_ceph-mysql_default_608af6aa-5335-11e5-b56b-52540039f12e_b0163abc   
@@ -100,13 +104,16 @@ The mysql container ID is 9a43017dbebf. More details on this container are avail
 The container's rbd mounts are visible directly from the host and from within the container itself. On the OSE host:
 
 ```
+#on the target/scheduled OSE-node:
 $ mount | grep rbd
 /dev/rbd0 on /var/lib/openshift/openshift.local.volumes/plugins/kubernetes.io/rbd/rbd/rbd-image-foo type ext4 (rw,relatime,seclabel,stripe=1024,data=ordered)
 /dev/rbd0 on /var/lib/openshift/openshift.local.volumes/pods/608af6aa-5335-11e5-b56b-52540039f12e/volumes/kubernetes.io~rbd/ceph-pv type ext4 (rw,relatime,seclabel,stripe=1024,data=ordered)
 ```
+
 And, shelling into the container:
 
 ```
+#on the target/scheduled OSE-node:
 $ docker exec -it 9a43017dbebf bash
 root@ceph-mysql:/# mount | grep rbd
 /dev/rbd0 on /var/lib/mysql type ext4 (rw,relatime,seclabel,stripe=1024,data=ordered)
@@ -117,6 +124,7 @@ exit
 Mysql can also be run in the container as follows:
 
 ```
+#on the target/scheduled OSE-node:
 $ docker exec -it 9a43017dbebf bash
 root@ceph-mysql:/# mysql                                                       
 Welcome to the MySQL monitor.  Commands end with ; or \g.
