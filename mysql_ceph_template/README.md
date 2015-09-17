@@ -15,9 +15,10 @@ The steps needed to setup ceph in a single container (AIO, all-in-one container)
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized mysql.
 
 ### Defining the Template File:
-Here is the [template file](ceph-mysql-template.yaml) which defines both the persistent volume claim (PVC) and the pod. The actual persistent volume (PV) has already been created in [example 3](../mysql_ceph_pvc), and is verified here. Note, as in the other examples, the mysql pod/container needs to run privileged, and this is set in the container spec portion of the template.
+Here is the [template file](ceph-mysql-template.yaml) which defines both the persistent volume claim (PVC) and the pod. The actual persistent volume (PV) has already been created in [example 3](../mysql_ceph_pvc), and is verified here. Note, as in the other examples, the mysql pod/container needs to run privileged, which is specified in the "container:" portion of the template.
 
 ```
+#on the OSE-master:
 $ oc get pv
 NAME                 LABELS    CAPACITY     ACCESSMODES   STATUS    CLAIM                   REASON
 ceph-pv              <none>    2147483648   RWX           Bound     default/ceph-claim 
@@ -26,6 +27,7 @@ ceph-pv              <none>    2147483648   RWX           Bound     default/ceph
 ### Create the Template Object:
 
 ```
+#on the OSE-master:
 $ oc create -f ceph-mysql-template.yaml 
 templates/ceph-mysql-template
 
@@ -40,6 +42,7 @@ Note: when re-using this template, if the pvc already exists, you'll see this er
 Before the mysql app can be created from the above template, we need to make sure there is a PV available for the defined template claim. The *oc get pv* command above shows that the only PV we have is Bound to the "ceph-claim", which we created in [example 3](../mysql_ceph_pvc). Therefore, we first need to delete the current PVC:
 
 ```
+#on the OSE-master:
 $ oc delete pvc ceph-claim
 persistentvolumeclaims/ceph-claim
 
@@ -54,6 +57,7 @@ ceph-pv              <none>    2147483648   RWX           Released   default/cep
 Notice that the "ceph-claim" is gone and that the "ceph-pv" is Released. This may be a bug, but currently a new claim cannot bind to a Released PV; therefore, we have to also delete and recreate the PV before we can start mysql from the template.
 
 ```
+#on the OSE-master:
 $ oc delete pv 
 persistentvolumes/ceph-pv
 
@@ -71,6 +75,7 @@ The pv file used above is defined [here](../mysql_ceph_pvc/ceph-pv.yaml).
 The *oc new-app* command, which accepts a template object (or a template file can be specified), is used to create the mysql app from this template:
 
 ```
+#on the OSE-master:
 $ oc new-app ceph-mysql-template
 persistentvolumeclaims/ceph-claim-template
 pods/ceph-mysql-pod
@@ -80,6 +85,7 @@ Run 'oc status' to view your app.
 Check on the PV, PVC and pod:
 
 ```
+#on the OSE-master:
 $ oc get pvc
 NAME                  LABELS    STATUS    VOLUME
 ceph-claim-template   map[]     Bound     ceph-pv
@@ -123,9 +129,11 @@ Events:
   Fri, 04 Sep 2015 16:04:11 -0400	Fri, 04 Sep 2015 16:04:11 -0400	1	{kubelet 192.168.122.254}	spec.containers{mysql-from-template}	createdCreated with docker id 183be9a22a13
   Fri, 04 Sep 2015 16:04:11 -0400	Fri, 04 Sep 2015 16:04:11 -0400	1	{kubelet 192.168.122.254}	spec.containers{mysql-from-template}	startedStarted with docker id 183be9a22a13
 ```
+
 On the target OSE node we can verify that msql is working:
 
 ```
+#on the scheduled/target OSE-node:
 $ docker ps
 CONTAINER ID        IMAGE                         COMMAND                CREATED             STATUS              PORTS               NAMES
 183be9a22a13        mysql                         "/entrypoint.sh mysq   5 minutes ago       Up 5 minutes                            k8s_mysql-from-template.b4384d92_ceph-mysql-pod_default_af388e69-533c-11e5-b56b-52540039f12e_faf1cdc0   
