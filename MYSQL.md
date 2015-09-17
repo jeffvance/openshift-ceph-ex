@@ -26,12 +26,43 @@ $ docker rm <mysql-container-ID>
 $ docker rm $(docker ps -a)
 ```
 
-Shell into the mysql container and run mysql -p:
+Shell into the mysql container, run mysql -p and create a simple "us_states" database:
 
 ```
 $ docker exec -it <mysql-container-ID> bash
 bash# mysql -p
 mysql> show databases;
++---------------------+
+| Database            |
++---------------------+
+| information_schema  |
+| #mysql50#lost+found |
+| mysql               |
+| performance_schema  |
++---------------------+
+4 rows in set (0.12 sec)
+
+# create a simple database for us states:
+mysql> CREATE DATABASE us_states;
+Query OK, 1 row affected (0.03 sec)
+
+mysql> USE us_states;
+Database changed
+
+mysql> CREATE TABLE states (id INT NOT NULL PRIMARY KEY AUTO_INCREMENT, state CHAR(25), population INT(9));
+Query OK, 0 rows affected (1.93 sec)
+
+mysql>  INSERT INTO states (id, state, population) VALUES (NULL, 'Alabama', '4822023');
+Query OK, 1 row affected (0.17 sec)
+
+mysql> SELECT * FROM states;
++----+---------+------------+
+| id | state   | population |
++----+---------+------------+
+|  1 | Alabama |    4822023 |
++----+---------+------------+
+1 row in set (0.00 sec)
+
 mysql> quit
 bash# exit
 ```
