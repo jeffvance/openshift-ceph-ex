@@ -145,13 +145,14 @@ Sep 04 00:48:09 rhel7-ose-2 openshift-node[94526]: I0904 00:48:09.198268   94526
 Sep 04 00:48:09 rhel7-ose-2 openshift-node[94526]: I0904 00:48:09.202366   94526 status_manager.go:129] Ignoring same status for pod "mysql_default", status: {Phase:Running Conditions:[{Type:Ready Status:True}] Message: Reason: HostIP:192.168.122.254 PodIP:10.1.0.41 StartTime:2015-09-03 19:10:07.598461546 -0400 EDT ContainerStatuses:[{Name:mysql State:{Waiting:<nil> Running:0xc213e6d0c0 Terminated:<nil>} LastTerminationState:{Waiting:<nil> Running:<nil> Terminated:<nil>} Ready:true RestartCount:0 Image:mysql ImageID:docker://7eee2d462c8f6ffacfb908cc930559e21778f60afdb2d7e9cf0f3025274d7ea8 ContainerID:docker://77f4af567e3dd3b10656ad5ee38a39600174a87c519d6a23735e96cf0ee4208a}]}
 ```
 
-And some docker checks on the OSE node:
+And some docker checks on *each* OSE node:
 
 ```
-$ docker ps   # make sure docker is running
+$ docker ps   #make sure docker is running
 
-# if docker is not running then start it:
+#if docker is not running then start it:
 $ systemctl start docker
+$ systemctl enable docker
 $ systemctl status docker -l
 ```
 
