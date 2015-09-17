@@ -56,7 +56,7 @@ $ docker rm <mysql-container-ID>
 ```
 
 ### Security:
-If the mysql container is not privileged then it will fail with this error:
+When using the ceph-rbd plugin, if the mysql container is not privileged then it will fail with this error:
 
 ```
 chown: cannot read directory `/var/lib/mysql/': Permission denied
@@ -69,14 +69,7 @@ $ docker ps -a  #need -a since the container start fails
 $ docker logs <mysql-id>
 ```
 
-Even setting the selinxu context for /opt/mysql (which is the host directory being bound to /var/lib/mysql inside the container) on the OSE-node does not fix the issue. Eg., on the OSE-node:
-
-```
-$ chcon -Rt svirt_sandbox_file_t /opt/mysql
-```
-still fails with the same permissions error.
-
-The only solution that seems to allow the mysql container to start correctly is to set the mysql pod to be privileged, which is done with this yaml fragment:
+The "quick" solution that seems to allow the mysql container to start correctly is to set the mysql pod to be privileged, which is done with this yaml fragment:
 
 ```
 spec:
