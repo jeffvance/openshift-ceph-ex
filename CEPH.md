@@ -1,9 +1,9 @@
 ## Setting up Ceph in a Single Container
 
-Here is an example of how to set up and run ceph-rbd in a single container. .
+Here is an example of how to set up and run ceph-rbd in a single container. Note: this document describes setting up ceph in a simple and insecure manner which is absolutely not appropriate for any type of production environment, but it is an easy way to get ceph up and running.
 
 ### Environment:
-The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM is used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which, when using kvm, shows up as */dev/vdb*.
+The enviromnent used for all of the examples in this repo is described [here](ENV.md). A Fedora 21 VM is used to run containerized ceph. It’s important to create an additional disk on your ceph VM in order to map the ceph image (not to be confused with a docker image) to this extra disk device. Create an extra 8GB disk which, when using KVM, shows up as */dev/vdb* (other VMs may name the extra disk */dev/sdb*).
 
 Below we show docker considerations, how to install ceph-common (client libraries), security and authorization suggestions, so that the OSE pod running mysql can do the ceph RBD mount.
 
@@ -15,7 +15,7 @@ $ docker --version
 Docker version 1.6.0, build 350a636/1.6.0
 ```
 
-On Fedora 21 there seems to be a docker 1.8 problem with storage setup where the docker-metapool is too small. So, if your docker version is 1.8 then you should consider:
+On Fedora 21 there seems to be a docker 1.8 problem with storage setup where the docker-metapool is too small. So, if your docker version is 1.8 then you should consider downgrading to 1.7 or 1.6.
 
 ```
 $ yum --showduplicates  list | grep ^docker
