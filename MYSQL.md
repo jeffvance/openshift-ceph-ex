@@ -67,7 +67,7 @@ mysql> quit
 bash# exit
 ```
 
-Note: *-p* causes mysql to prompt for the user's password, even if the password has been provided via the MYSQL_ROOT_PASSWORD env variable. In some cases, as seen here, *-p* is required for the mysql command to succeed. Omitting *-p* in this case causes the error below:
+Note: *-p* causes mysql to prompt for the user's password, even if the password has been provided via the MYSQL_ROOT_PASSWORD env variable. In some cases, as seen here, *-p* is required for the mysql command to succeed. Omitting *-p* (even when the root password is specified in the environment), in my case, causes the error below:
 
 ```
 #On the host running the mysql container we see the password is provided:
