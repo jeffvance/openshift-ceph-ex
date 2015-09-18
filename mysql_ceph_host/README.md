@@ -25,8 +25,9 @@ The [pod spec](mysql.yaml) uses a mysql image, defines the password as an enviro
 
 ```
 #on *each* OSE-node:
-$ chcon -Rt svirt_sandbox_file_t /opt/mysql
+$ mkdir -p /opt/mysql
 
+$ chcon -Rt svirt_sandbox_file_t /opt/mysql
 $ ls -Zd /opt/mysql/
 drwxr-xr-x. polkitd ssh_keys system_u:object_r:svirt_sandbox_file_t:s0 /opt/mysql/
 ```
