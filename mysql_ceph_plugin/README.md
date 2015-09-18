@@ -38,6 +38,21 @@ NAME                      READY     STATUS          RESTARTS   AGE
 mysql                     1/1       Running         0          18s
 ```
 
+To see volume information for this pod:
+
+```
+#on the OSE-master:
+$ oc volume pod mysql --list
+# pods mysql, volumes:
+mysql-ceph
+default-token-sqef4
+	# container mysql, volume mounts:
+	mysql-ceph /var/lib/mysql
+	default-token-sqef4 /var/run/secrets/kubernetes.io/serviceaccount
+
+```
+"mysql-ceph" is the volume name defined in the pod spec.
+
 To see which OSE host the mysql pod has been scheduled on:
 
 ```
