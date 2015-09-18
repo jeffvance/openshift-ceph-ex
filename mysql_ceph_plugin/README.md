@@ -1,5 +1,13 @@
 ## Example 2: Using the Ceph-RBD Plugin
-This example uses the ceph/rbd plugin directly in the pod spec.
+This example uses the ceph/rbd plugin directly in the pod spec. Make sure that any mysql pod created in another example has been deleted before continuing with this example:
+
+```
+#on the OSE-master:
+$ oc get pods
+
+#if you see a mysql pod above:
+$ oc delete pod <pod-name>
+```
 
 ### Environment:
 The enviromnent used for all of the examples in this repo is described [here](../ENV.md).
