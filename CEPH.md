@@ -8,28 +8,9 @@ The enviromnent used for all of the examples in this repo is described [here](EN
 Below we show docker considerations, how to install ceph-common (client libraries), security and authorization suggestions, so that the OSE pod running mysql can do the ceph RBD mount.
 
 ### Docker:
-Fedora 21 has docker pre-installed but make sure the docker version is 1.6 or 1.7 -- not 1.8.
+Fedora 21 has docker pre-installed but make sure the docker version is 1.6 or 1.7 -- not 1.8. See the [ENV readme](ENV.md) for information on downgrading or upgrading the installed version of docker.
 
-```
-$ docker --version
-Docker version 1.6.0, build 350a636/1.6.0
-```
-
-On Fedora 21 there seems to be a docker 1.8 problem with storage setup where the docker-metapool is too small. So, if your docker version is 1.8 then you should consider downgrading to 1.7 or 1.6.
-
-```
-$ yum --showduplicates  list | grep ^docker
-
-#if you see docker 1.6 or 1.7 then...
-$ yum install -y docker-1.6  #or docker-1.7
-```
-
-If docker is lower than 1.6 then:
-
-```
-yum install -y docker-1.6  #or docker-1.7
-```
-
+### Ceph:
 Now install the ceph-common library:
 
 ```
