@@ -31,6 +31,9 @@ objects:
       volumeMounts:
       - mountPath: /var/lib/mysql
         name: mysql-pv
+      env:
+      - name: MYSQL_ROOT_PASSWORD
+        value: foopass
       securityContext:
         capabilities: {}
         privileged: true #privileged required for the rbd mount
