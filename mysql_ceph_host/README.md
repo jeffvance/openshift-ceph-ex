@@ -1,5 +1,13 @@
 ## Example 1: Using Local (hostPath) Storage
-This example uses the local storage directly on the OSE host where the mysql container is running.
+This example uses the local storage directly on the OSE host where the mysql container is running. Make sure that any mysql pod created in another example has been deleted before continuing with this example:
+
+```
+#on the OSE-master:
+$ oc get pods
+
+#if you see a mysql pod above:
+$ oc delete pod <pod-name>
+```
 
 ### Environment:
 The enviromnent used for all of the examples in this repo is described [here](../ENV.md).
