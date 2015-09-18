@@ -10,6 +10,8 @@ $ oc delete pod <pod-name>
 ```
 
 ### Environment:
+If the steps to install the environment, ose and mysql have not already been completed, then follow the instuctions linked-to directly below:
+
 The enviromnent used for all of the examples in this repo is described [here](../ENV.md).
 
 ### Setting up Openshift Enterprise (OSE):
