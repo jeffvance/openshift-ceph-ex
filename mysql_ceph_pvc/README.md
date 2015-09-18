@@ -54,7 +54,20 @@ NAME                      READY     STATUS       RESTARTS   AGE
 ceph-mysql                1/1       Running                                      
 ```
 
-We see above that the "ceph-mysql" pod is running. We can use *oc describe pod* to see which OSE host the pod is running on, and to see the pod's recent events:
+Volume information is also visible on the OSE-master:
+
+```
+#on the OSE-master:
+$ oc volume pod ceph-mysql --list
+# pods ceph-mysql, volumes:
+mysql-pv
+default-token-sqef4
+	# container ceph-mysql, volume mounts:
+	mysql-pv /var/lib/mysql
+	default-token-sqef4 /var/run/secrets/kubernetes.io/serviceaccount
+```
+
+We execute *oc describe pod* to see which OSE host the pod is running on, and to see the pod's recent events:
 
 ```
 #on the OSE-master:
