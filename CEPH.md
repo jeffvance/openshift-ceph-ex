@@ -122,6 +122,14 @@ $ echo "AQDva7JVEuVJBBAAc8e1ZBWhqUB9K/zNZdOHoQ=="| base64
 QVFEdmE3SlZFdVZKQkJBQWM4ZTFaQldocVVCOUsvek5aZE9Ib1E9PQo=
 # copy the above base64 output
 ```
+Note: if the base64 conversion step is omitted and a pod using the non-base64 ceph secret is created, it will fail with an error like this:
+
+```
+...
+-0400        8        {kubelet ose2.rhs}                        failedSync        Error syncing pod, skipping: fork/exec /usr/bin/rbd: invalid argument
+```
+
+So, the base64 conversion is critical.
 
 See the [OSE setup readme](OSE.md) for details on how to use this required feature.
 
