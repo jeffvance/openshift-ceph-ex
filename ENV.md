@@ -6,7 +6,8 @@
 The RHEL-7 hosts running the OSE master and OSE nodes should have the following services enabled and running:
 * selinux (*setenforce 1*)
 * iptables (*systemctl start iptables*)
-* firewalld (*systemctl start firewalld*) Note, if you cannot start firewalld due to the service being masked, you can do a *systemctl unmask firewalld* and then restart it.
+* firewalld (*systemctl start firewalld*) Note, if you cannot start firewalld due to the service being masked, you can do a *systemctl unmask firewalld* and then restart it
+* the OSE worker nodes and the ceph host need to be running docker. Currently docker version 1.8 has storage setup issues, so see below on how to upgrade or downgrade the version of docker on your VMs.
 
 The ceph host is not protected in these examples (ie. selinux is running in permissive mode and the firewall is disabled); however, the point here is not how to setup a secure ceph environment, but rather how to run mysql from OSE using an existing (and presumed secure) ceph cluster.
 
