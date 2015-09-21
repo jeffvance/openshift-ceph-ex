@@ -4,6 +4,12 @@
 The enviromnent used for all of the examples in this repo is described [here](ENV.md).
 
 ### Setting up OSE:
+The following OpenShift/origin guides should be followed when setting up OSE:
+  * https://docs.openshift.com/enterprise/3.0/admin_guide/install/prerequisites.html -- Prerequisites
+  * https://docs.openshift.org/latest/getting_started/administrators.html#running-in-a-docker-container -- Getting Started for Administrator
+  * https://docs.openshift.com/enterprise/3.0/admin_guide/install/quick_install.html -- Quick Installation
+  * https://docs.openshift.com/enterprise/3.0/admin_guide/configuring_authentication.html -- Configuring Authentication
+
 OpenShift is installed following the [OpenShift Admin Guide – quick installation](https://docs.openshift.com/enterprise/3.0/admin_guide/install/quick_install.html).
 
 To consider OSE installed and working the OSE master server must be running, all OSE worker-nodes are running, you are able to login to the OpenShift Console via the GUI (https://master-host:8443/console), you have access to the OSE *oc* command, and you can login to the console, eg:
