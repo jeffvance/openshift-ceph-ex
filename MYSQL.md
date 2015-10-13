@@ -2,7 +2,9 @@
 
 First, OSE's Security Context Constraints (SSC) need to be defined such that the *seLinuxContext* and *runAsUser* values are set to "RunAsAny". Selinux is still enabled/enforcing on the master and worker-node hosts, as decribed in the [OSE environment readme](ENV.md).
 
-Our mysql example uses the official mysql image found [here](https://hub.docker.com/_/mysql/). First, pull down the image on *each* of your OSE worker nodes:
+Our mysql example uses the docker mysql image found [here](https://hub.docker.com/_/mysql/). There is also an "official" [openshift/mysql](https://hub.docker.com/r/openshift/mysql-55-centos7/) image available ([repo](https://github.com/openshift/mysql)), which is more restrictive in that the container's UID is hardcoded to 27 (arbitrary). Almost all of the examples in this repo use the docker mysql image, but, to get a feel for some of the issues when the container's UID is not root (0), the openshift/docker image provides insights.
+
+First, pull down the desired mysql image on *each* of your OSE worker nodes:
 
 ```
 #on *each* OSE-node:
