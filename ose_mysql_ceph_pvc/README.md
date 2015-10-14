@@ -93,7 +93,21 @@ $ oc get dc
 NAME               TRIGGERS                    LATEST VERSION
 docker-registry    ConfigChange                2
 mysql-55-centos7   ConfigChange, ImageChange   1
+
+#list volumes:
+$ oc volume --list dc --all
+# deploymentconfigs docker-registry, volumes:
+registry-storage
+	# container registry, volume mounts:
+	registry-storage /registry
+
+# deploymentconfigs mysql-55-centos7, volumes:
+mysql-55-centos7-volume-1
+	# container mysql-55-centos7, volume mounts:
+	mysql-55-centos7-volume-1 /var/lib/mysql/data
 ```
+
+Notice that the default volume name is the image name with "-volume-*N*" appended.
 
 ### Creating the Pod:
 The [pod spec](ceph-mysql-pvc-pod.yaml) references the same mysql image and defines the named claim to be used for persistent storage. As with [example 2](../mysql_ceph_plugin), the mysql container needs to run privileged. *oc create* is used to create the pod:
