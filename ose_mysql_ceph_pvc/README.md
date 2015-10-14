@@ -96,7 +96,7 @@ mysql-55-centos7   ConfigChange, ImageChange   1
 ```
 
 ### Volume Binding:
-Now that the mysql pod has been successfully created (using the *emptyDir* volume), it's time to bind the container to the ceph volume.
+Now that the mysql pod has been successfully created (using the *emptyDir* volume), it's time to update the volume bind mount to reference the ceph volume claim.
 
 Volume information is visible on the OSE-master:
 
