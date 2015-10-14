@@ -8,7 +8,7 @@ This example is similar to [example 3](../mysql_ceph_pvc) except that we're usin
   * a new deployment configuration named "mysql-55-centos7"
   * a new imageStream named "mysql-55-centos7" 
   * an emptyDir volume named ""
-  * the target mysql pod named "xxx".
+  * the target mysql pod named "mysql-55-centos7-1-<random-letters-here>".
 
 ### Environment:
 If the steps to install the environment, ceph, ose and mysql have not already been completed, then follow the instuctions linked-to directly below:
@@ -47,7 +47,28 @@ NAME         LABELS    STATUS    VOLUME
 ceph-claim   map[]     Bound     mysql-55-centos7-volume-1
 ```
 
-Notice that the claim has been bound to the "ceph-pv" persistent volume.
+### Creating the openshift/mysql App:
+
+```
+$ oc new-app -e MYSQL_USER=mysql,MYSQL_PASSWORD=foopass,MYSQL_DATABASE=mysql openshift/mysql-55-centos7
+NOTICE: Image "mysql-55-centos7" uses an EmptyDir volume. Data in EmptyDir volumes is not persisted across deployments.
+imagestreams/mysql-55-centos7
+deploymentconfigs/mysql-55-centos7
+services/mysql-55-centos7
+Service "mysql-55-centos7" created at 172.30.253.191 with port mappings 3306.
+Run 'oc status' to view your app.
+
+$ oc status
+In project default
+service/kubernetes - 172.30.0.1:443
+service/mysql-55-centos7 - 172.30.253.191:3306
+  dc/mysql-55-centos7 deploys istag/mysql-55-centos7:latest 
+    #1 deployment pending 6 seconds ago
+dc/docker-registry deploys registry.access.redhat.com/openshift3/ose-docker-registry:v3.0.1.0 
+  #2 deployed 2 weeks ago - 1 pod
+To see more, use 'oc describe <resource>/<name>'.
+You can use 'oc get all' to see a list of other objects.
+```
 
 ### Creating the Pod:
 The [pod spec](ceph-mysql-pvc-pod.yaml) references the same mysql image and defines the named claim to be used for persistent storage. As with [example 2](../mysql_ceph_plugin), the mysql container needs to run privileged. *oc create* is used to create the pod:
