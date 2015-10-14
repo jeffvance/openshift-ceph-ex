@@ -1,6 +1,14 @@
 ## Example 5: Using openshift/mysql, Ceph Persistent Volume and Claim
 
-This example is similar to [example 3](../mysql_ceph_pvc) except that we're using the official openshift mysql image. This image has the UID hard-coded to 27 in the Dockerfile, and as a result presents challenges from a permissions/volume-mounting perspective. The solution to running the mysql container as non-root is to separate the creation of the pod from the creation of the bind mounts for the container.
+This example is similar to [example 3](../mysql_ceph_pvc) except that we're using the official openshift mysql image. This image has the UID hard-coded to 27 in the Dockerfile, and as a result presents challenges from a permissions/volume-mounting perspective. The solution to running the mysql container as non-root is to separate the creation of the pod from the creation of the bind mounts for the container. This is accomplished by using the *oc new-app* command to create the pod with the default emptyDir volume binding, followed by *oc volume* to replace emptyDir with the ceph rbd plugin binding.
+
+*oc new-app* in this example creates the following:
+  * a new service named "mysql-55-centos7"
+  * a new replication controller named "mysql-55-centos7-1"
+  * a new deployment configuration named "mysql-55-centos7"
+  * a new imageStream named "mysql-55-centos7" 
+  * an emptyDir volume named ""
+  * the target mysql pod named "xxx".
 
 ### Environment:
 If the steps to install the environment, ceph, ose and mysql have not already been completed, then follow the instuctions linked-to directly below:
@@ -17,26 +25,26 @@ The steps needed to setup ceph in a single container (AIO, all-in-one container)
 Follow the instructions [here](../MYSQL.md) to initialize and validate containerized openshift/mysql. Be sure to *docker pull* the openshift/mysql image.
 
 ### Defining the PV and PVC Files:
-The [PVC](../mysql_ceph_pvc/ceph-claim.yaml) created here is the same used in [example 3](../mysql_ceph_pvc); however, the [PV](xx) has a different name to coincide with the default naming used by the *oc new-app* command. PVs are typically created by an OSE administrator, whereas PVCs will typically be created and requested by non-admins. The example here creates both the PV and claim separate from the pod.
+The [PVC](../mysql_ceph_pvc/ceph-claim.yaml) created here is the same used in [example 3](../mysql_ceph_pvc); however, the [PV](mysql-55-centos7-volume-1.yaml) has a different name to coincide with the default naming used by the *oc new-app* command. PVs are typically created by an OSE administrator, whereas PVCs will typically be created and requested by non-admins. The example here creates both the PV and claim separate from the pod.
 
 ### Creating the PV and PVC:
 *oc create -f* is execute on the OSE-master to create almost all OSE objects, and is used here to create the ceph PV and PVC.
 
 ```
 #on the OSE-master:
-$ oc create -f xxx.yaml
-persistentvolumes/ceph-pv
+$ oc create -f mysql-55-centos7-volume-1.yaml
+persistentvolumes/mysql-55-centos7-volume-1
 
 $ oc get pv
-NAME                 LABELS    CAPACITY     ACCESSMODES   STATUS      CLAIM                   REASON
-ceph-pv              <none>    2147483648   RWX           Available             
+NAME                        LABELS    CAPACITY     ACCESSMODES   STATUS      CLAIM     REASON
+mysql-55-centos7-volume-1   <none>    1073741824   RWX           Available      
 
 $ oc create -f ../mysql_ceph_pvc/ceph-claim.yaml
 persistentvolumeclaims/ceph-claim
 
 $ oc get pvc
-NAME            LABELS    STATUS    VOLUME
-ceph-claim      map[]     Bound     ceph-pv
+NAME         LABELS    STATUS    VOLUME
+ceph-claim   map[]     Bound     mysql-55-centos7-volume-1
 ```
 
 Notice that the claim has been bound to the "ceph-pv" persistent volume.
