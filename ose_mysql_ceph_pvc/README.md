@@ -7,7 +7,7 @@ This example is similar to [example 3](../mysql_ceph_pvc) except that we're usin
   * a new replication controller named "mysql-55-centos7-1"
   * a new deployment configuration named "mysql-55-centos7"
   * a new imageStream named "mysql-55-centos7" 
-  * an emptyDir volume named ""
+  * an emptyDir volume named "mysql-55-centos7-volume-1"
   * the target mysql pod named "mysql-55-centos7-1-<random-letters-here>".
 
 ### Environment:
@@ -48,6 +48,7 @@ ceph-claim   map[]     Bound     mysql-55-centos7-volume-1
 ```
 
 ### Creating the openshift/mysql App:
+The *oc new-app* command is used to create the openshift/mysql pod along with the other objects listed above.
 
 ```
 $ oc new-app -e MYSQL_USER=mysql,MYSQL_PASSWORD=foopass,MYSQL_DATABASE=mysql openshift/mysql-55-centos7
@@ -68,6 +69,30 @@ dc/docker-registry deploys registry.access.redhat.com/openshift3/ose-docker-regi
   #2 deployed 2 weeks ago - 1 pod
 To see more, use 'oc describe <resource>/<name>'.
 You can use 'oc get all' to see a list of other objects.
+
+#list pods:
+$ oc get pods
+NAME                       READY     STATUS                                                                                                      RESTARTS   AGE
+docker-registry-2-a57pb    0/1       Image: registry.access.redhat.com/openshift3/ose-docker-registry:v3.0.1.0 is ready, container is creating   0          1h
+mysql-55-centos7-1-nmhmk   1/1       Running                                    
+
+#list services:
+$ oc get svc
+NAME               LABELS                                    SELECTOR                            IP(S)            PORT(S)
+kubernetes         component=apiserver,provider=kubernetes   <none>                              172.30.0.1       443/TCP
+mysql-55-centos7   app=mysql-55-centos7                      deploymentconfig=mysql-55-centos7   172.30.253.191   3306/TCP
+
+#list replication controllers:
+$ oc get rc
+CONTROLLER           CONTAINER(S)       IMAGE(S)                                                             SELECTOR                                                                                REPLICAS
+docker-registry-2    registry           registry.access.redhat.com/openshift3/ose-docker-registry:v3.0.1.0   deployment=docker-registry-2,deploymentconfig=docker-registry,docker-registry=default   1
+mysql-55-centos7-1   mysql-55-centos7   openshift/mysql-55-centos7:latest                                    deployment=mysql-55-centos7-1,deploymentconfig=mysql-55-centos7 
+
+#list deployment configurations:
+$ oc get dc
+NAME               TRIGGERS                    LATEST VERSION
+docker-registry    ConfigChange                2
+mysql-55-centos7   ConfigChange, ImageChange   1
 ```
 
 ### Creating the Pod:
