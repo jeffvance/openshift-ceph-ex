@@ -118,6 +118,33 @@ registry-storage
 mysql-55-centos7-volume-1
 	# container mysql-55-centos7, volume mounts:
 	mysql-55-centos7-volume-1 /var/lib/mysql/data
+
+#list more details about the new volume:
+$ oc describe dc mysql-55-centos7
+Name:		mysql-55-centos7
+Created:	31 minutes ago
+Labels:		app=mysql-55-centos7
+Latest Version:	1
+Triggers:	Config, Image(mysql-55-centos7@latest, auto=true)
+Strategy:	Rolling
+Template:
+  Selector:	deploymentconfig=mysql-55-centos7
+  Replicas:	1
+  Containers:
+  NAME			IMAGE					ENV
+  mysql-55-centos7	openshift/mysql-55-centos7:latest	MYSQL_DATABASE=mysql,MYSQL_PASSWORD=pass,MYSQL_USER=mysql
+Deployment #1 (latest):
+	Name:		mysql-55-centos7-1
+	Created:	31 minutes ago
+	Status:		Complete
+	Replicas:	1 current / 1 desired
+	Selector:	deployment=mysql-55-centos7-1,deploymentconfig=mysql-55-centos7
+	Labels:		app=mysql-55-centos7,openshift.io/deployment-config.name=mysql-55-centos7
+	Pods Status:	1 Running / 0 Waiting / 0 Succeeded / 0 Failed
+Events:
+  FirstSeen				LastSeen			Count	From		SubobjectPath	Reason		Message
+  Wed, 14 Oct 2015 13:12:08 -0400	Wed, 14 Oct 2015 13:12:08 -0400	1	{deployer }			failedCreate	Couldn't create initial deployment: DeploymentConfig "mysql-55-centos7" is invalid: triggers[1].imageChange.tag: invalid value 'latest': no image recorded for default/mysql-55-centos7:latest
+
 ```
 
 Notice that the default volume name is the image name with "-volume-*N*" appended.
