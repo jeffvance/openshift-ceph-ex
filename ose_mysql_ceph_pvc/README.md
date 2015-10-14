@@ -95,7 +95,10 @@ docker-registry    ConfigChange                2
 mysql-55-centos7   ConfigChange, ImageChange   1
 ```
 
-Volume information is also visible on the OSE-master:
+### Volume Binding:
+Now that the mysql pod has been successfully created (using the *emptyDir* volume), it's time to bind the container to the ceph volume.
+
+Volume information is visible on the OSE-master:
 
 ```
 #on the OSE-master:
@@ -113,7 +116,6 @@ $ oc volume --list dc --all
 registry-storage
 	# container registry, volume mounts:
 	registry-storage /registry
-
 # deploymentconfigs mysql-55-centos7, volumes:
 mysql-55-centos7-volume-1
 	# container mysql-55-centos7, volume mounts:
@@ -141,61 +143,13 @@ Deployment #1 (latest):
 	Selector:	deployment=mysql-55-centos7-1,deploymentconfig=mysql-55-centos7
 	Labels:		app=mysql-55-centos7,openshift.io/deployment-config.name=mysql-55-centos7
 	Pods Status:	1 Running / 0 Waiting / 0 Succeeded / 0 Failed
-Events:
-  FirstSeen				LastSeen			Count	From		SubobjectPath	Reason		Message
-  Wed, 14 Oct 2015 13:12:08 -0400	Wed, 14 Oct 2015 13:12:08 -0400	1	{deployer }			failedCreate	Couldn't create initial deployment: DeploymentConfig "mysql-55-centos7" is invalid: triggers[1].imageChange.tag: invalid value 'latest': no image recorded for default/mysql-55-centos7:latest
-
+...
 ```
 
 Notice that the default volume name is the image name with "-volume-*N*" appended.
 
 
-We execute *oc describe pod* to see which OSE host the pod is running on, and to see the pod's recent events:
 
-```
-#on the OSE-master:
-$ oc describe pod ceph-mysql
-Name:				ceph-mysql
-Namespace:			default
-Image(s):			mysql
-Node:				192.168.122.254/192.168.122.254  # <--- often both hostname and ip are shown here
-Labels:				<none>
-Status:				Running
-Reason:				
-Message:			
-IP:				10.1.0.43
-Replication Controllers:	<none>
-Containers:
-  ceph-mysql:
-    Image:		mysql
-    State:		Running
-      Started:		Fri, 04 Sep 2015 14:47:31 -0400
-    Ready:		True
-    Restart Count:	0
-Conditions:
-  Type		Status
-  Ready 	True 
-Events:
-  FirstSeen				LastSeen			Count	From				SubobjectPath				Reason	Message
-  Fri, 04 Sep 2015 14:47:22 -0400	Fri, 04 Sep 2015 14:47:22 -0400	1	{scheduler }								scheduled	Successfully assigned ceph-mysql to 192.168.122.254
-  Fri, 04 Sep 2015 14:47:24 -0400	Fri, 04 Sep 2015 14:47:24 -0400	1	{kubelet 192.168.122.254}	implicitly required container POD	pulled	Pod container image "openshift3/ose-pod:v3.0.1.0" already present on machine
-  Fri, 04 Sep 2015 14:47:26 -0400	Fri, 04 Sep 2015 14:47:26 -0400	1	{kubelet 192.168.122.254}	implicitly required container POD	createdCreated with docker id acbee2db9a18
-  Fri, 04 Sep 2015 14:47:27 -0400	Fri, 04 Sep 2015 14:47:27 -0400	1	{kubelet 192.168.122.254}	implicitly required container POD	startedStarted with docker id acbee2db9a18
-  Fri, 04 Sep 2015 14:47:30 -0400	Fri, 04 Sep 2015 14:47:30 -0400	1	{kubelet 192.168.122.254}	spec.containers{ceph-mysql}		createdCreated with docker id 9a43017dbebf
-  Fri, 04 Sep 2015 14:47:31 -0400	Fri, 04 Sep 2015 14:47:31 -0400	1	{kubelet 192.168.122.254}	spec.containers{ceph-mysql}		startedStarted with docker id 9a43017dbebf
-```
-
-We see that the pod was scheduled on OSE host 192.168.122.254 (often there is a hostname visible too). On the target OSE node verify that the mysql container is running and that it's using the ceph-rbd volume:
-
-```
-#on the target/scheduled OSE-node:
-$ docker ps
-CONTAINER ID        IMAGE                         COMMAND                CREATED             STATUS              PORTS               NAMES
-9a43017dbebf        mysql                         "/entrypoint.sh mysq   4 minutes ago       Up 4 minutes                            k8s_ceph-mysql.d8cb6e3e_ceph-mysql_default_608af6aa-5335-11e5-b56b-52540039f12e_b0163abc   
-acbee2db9a18        openshift3/ose-pod:v3.0.1.0   "/pod"                 4 minutes ago       Up 4 minutes                            k8s_POD.dbbbe7c7_ceph-mysql_default_608af6aa-5335-11e5-b56b-52540039f12e_d030f08f 
-```
-
-The mysql container ID is 9a43017dbebf. More details on this container are availble via *docker inspect container-ID-or-name*. Log information is shown via *docker logs container-ID*, and via the *systemctl status openshift-node -l* and *journalctl -xe -u openshift-node docker* commands.
 
 The container's rbd mounts are visible directly from the host and from within the container itself. On the OSE host:
 
