@@ -20,18 +20,18 @@ Follow the instructions [here](../MYSQL.md) to initialize and validate container
 The [PVC](../mysql_ceph_pvc/ceph-claim.yaml) created here is the same used in [example 3](../mysql_ceph_pvc); however, the [PV](xx) has a different name to coincide with the default naming used by the *oc new-app* command. PVs are typically created by an OSE administrator, whereas PVCs will typically be created and requested by non-admins. The example here creates both the PV and claim separate from the pod.
 
 ### Creating the PV and PVC:
-*oc create -f* is execute on the OSE-master to create almost all OSE objects and is used here to create the ceph PV and PVC.
+*oc create -f* is execute on the OSE-master to create almost all OSE objects, and is used here to create the ceph PV and PVC.
 
 ```
 #on the OSE-master:
-$ oc create -f ceph-pv.yaml
+$ oc create -f xxx.yaml
 persistentvolumes/ceph-pv
 
 $ oc get pv
 NAME                 LABELS    CAPACITY     ACCESSMODES   STATUS      CLAIM                   REASON
 ceph-pv              <none>    2147483648   RWX           Available             
 
-$ oc create -f ceph-claim.yaml
+$ oc create -f ../mysql_ceph_pvc/ceph-claim.yaml
 persistentvolumeclaims/ceph-claim
 
 $ oc get pvc
