@@ -148,7 +148,12 @@ Deployment #1 (latest):
 
 Notice that the default volume name is the image name with "-volume-*N*" appended.
 
+Use the *oc volume* command to bind the running pod (whose container has already run its entrypoint initialization script) to the ceph volume:
 
+```
+$ oc volume dc/mysql-55-centos7 --add --name=mysql-55-centos7-volume-1 -t persistentVolumeClaim --claim-name=ceph-claim --mount-path=/var/lib/mysql/data --overwrite
+deploymentconfigs/mysql-55-centos7
+```
 
 
 The container's rbd mounts are visible directly from the host and from within the container itself. On the OSE host:
