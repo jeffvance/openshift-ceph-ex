@@ -93,8 +93,21 @@ $ oc get dc
 NAME               TRIGGERS                    LATEST VERSION
 docker-registry    ConfigChange                2
 mysql-55-centos7   ConfigChange, ImageChange   1
+```
 
-#list volumes:
+Volume information is also visible on the OSE-master:
+
+```
+#on the OSE-master:
+$ oc volume pod mysql-55-centos7-1-nmhmk --list
+# pods mysql-55-centos7-1-nmhmk, volumes:
+mysql-55-centos7-volume-1
+default-token-1qip2
+	# container mysql-55-centos7, volume mounts:
+	mysql-55-centos7-volume-1 /var/lib/mysql/data
+	default-token-1qip2 /var/run/secrets/kubernetes.io/serviceaccount
+
+#list all volumes:
 $ oc volume --list dc --all
 # deploymentconfigs docker-registry, volumes:
 registry-storage
@@ -109,31 +122,6 @@ mysql-55-centos7-volume-1
 
 Notice that the default volume name is the image name with "-volume-*N*" appended.
 
-### Creating the Pod:
-The [pod spec](ceph-mysql-pvc-pod.yaml) references the same mysql image and defines the named claim to be used for persistent storage. As with [example 2](../mysql_ceph_plugin), the mysql container needs to run privileged. *oc create* is used to create the pod:
-
-```
-#on the OSE-master:
-$ oc create -f ceph-mysql-pvc-pod.yaml 
-pods/ceph-mysql
-
-$ oc get pods
-NAME                      READY     STATUS       RESTARTS   AGE
-ceph-mysql                1/1       Running                                      
-```
-
-Volume information is also visible on the OSE-master:
-
-```
-#on the OSE-master:
-$ oc volume pod ceph-mysql --list
-# pods ceph-mysql, volumes:
-mysql-pv
-default-token-sqef4
-	# container ceph-mysql, volume mounts:
-	mysql-pv /var/lib/mysql
-	default-token-sqef4 /var/run/secrets/kubernetes.io/serviceaccount
-```
 
 We execute *oc describe pod* to see which OSE host the pod is running on, and to see the pod's recent events:
 
