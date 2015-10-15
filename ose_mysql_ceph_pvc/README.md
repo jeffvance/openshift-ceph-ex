@@ -102,7 +102,7 @@ Volume information is visible on the OSE-master:
 
 ```
 #on the OSE-master:
-#list the volume based on pod selector:
+#list all volumes based on pod selector:
 $ oc volume pod/mysql-55-centos7-1-nmhmk --list
 # pods mysql-55-centos7-1-nmhmk, volumes:
 mysql-55-centos7-volume-1
