@@ -102,7 +102,8 @@ Volume information is visible on the OSE-master:
 
 ```
 #on the OSE-master:
-$ oc volume pod mysql-55-centos7-1-nmhmk --list
+#list the volume based on pod selector:
+$ oc volume pod/mysql-55-centos7-1-nmhmk --list
 # pods mysql-55-centos7-1-nmhmk, volumes:
 mysql-55-centos7-volume-1
 default-token-1qip2
@@ -110,18 +111,14 @@ default-token-1qip2
 	mysql-55-centos7-volume-1 /var/lib/mysql/data
 	default-token-1qip2 /var/run/secrets/kubernetes.io/serviceaccount
 
-#list all volumes:
-$ oc volume --list dc --all
-# deploymentconfigs docker-registry, volumes:
-registry-storage
-	# container registry, volume mounts:
-	registry-storage /registry
+#list the volume base on dc selector:
+$ oc volume dc/mysql-55-centos7 --list
 # deploymentconfigs mysql-55-centos7, volumes:
 mysql-55-centos7-volume-1
 	# container mysql-55-centos7, volume mounts:
 	mysql-55-centos7-volume-1 /var/lib/mysql/data
 
-#list more details about the new volume:
+#list more details about the volume:
 $ oc describe dc mysql-55-centos7
 Name:		mysql-55-centos7
 Created:	31 minutes ago
