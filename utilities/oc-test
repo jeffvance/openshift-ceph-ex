@@ -1,1 +1,293 @@
+#!/bin/bash
+#
+# oc-test creates ose pods on the ose-master node (defaults to localhost) and
+# runs one or more of the specified storage tests.
+#
+# See usage() for syntax.
+#
 
+VERSION=0.1
+VERIFY_ONLY=0 # false
+ALL_TESTS='general,nfs,gluster,rbd'
+TESTS='general' # default
+MASTER="$HOSTNAME"
+
+
+## functions ##
+
+function usage() {
+
+  cat <<END
+  oc-test - execute one or more ose storage tests
+
+SYNTAX
+  oc-test [test-name] [options]
+
+DESCRIPTION
+  Verifies the ose-master environment and, optionally, executes one or more
+  storage tests from the ose-master node.
+
+  test-name  A list of one or more tests to run. Expected values are:
+               general (default),
+               nfs,
+               gluster,
+               rbd (or ceph),
+               all.
+             More than one test is specified with a comma separator, eg.
+             "nfs,gluster".
+
+  --verify   Only test the ose enviromment but don't run any tests.
+  --master <node>
+             Hostname or ip of the ose-master node, default is local host
+  --version  Show the version string.
+
+END
+
+}
+
+# output the list of tests with commas replaced by spaces so it is suitable
+# for use as an array. Note: ceph and rbd are synonyms for the same test and
+# therefore ceph is changed to rbd. Returns 1 for errors.
+# $1= a list of 1 or more tests, comma separated.
+function parse_tests() {
+
+  local tests="${1/ceph/rbd}"
+  local test
+
+  tests="${tests//,/ }"
+
+  # validate known test names
+  for test in $tests; do
+     if [[ ! "$ALL_TESTS" =~ "$test" ]] ; then
+       echo "ERROR: unknown test \"$test\""
+       return -1
+     fi
+  done
+
+  echo "$tests"
+  return 0
+}
+
+# returns 1 on errors, else 0.
+function parse_cmd() {
+
+  local errcnt=0
+  local long_opts='version,master:,verify'
+
+  if (( $# == 0 )) ; then
+    usage && exit -1
+  fi
+
+  eval set -- "$(getopt -o 'y' --long $long_opts -- $@)"
+
+  while true; do
+      case "$1" in
+        --version)
+          echo $VERSION
+          exit 0
+        ;;
+
+        --verify)
+          VERIFY_ONLY=1; # true
+          shift; continue
+        ;;
+
+        --master)
+          MASTER="$2"
+          shift 2; continue
+        ;;
+
+        --)
+          shift; break
+        ;;
+      esac
+  done
+
+  if (( $# > 1 )) ; then
+    shift
+    echo "Syntax error: unexpected command line arg: $@"
+    return 1
+  fi
+
+  if (( $# == 1 )) ; then # test arg is optional
+    TESTS="$1"; shift
+    # handle "all" tests
+    if [[ "$TESTS" == 'all' ]] ; then
+      TESTS="$ALL_TESTS"
+    fi
+  fi
+
+  # handle a list of tests
+  TESTS="$(parse_tests "$TESTS")"
+  if (( $? != 0 )) ; then
+    echo "$TESTS" # error msg
+    return -1
+  fi
+  TESTS=($TESTS)  # array
+  NUM_TESTS=${#TESTS[@]}
+
+  return 0
+}
+
+# test ose env on passed-in node. Return 1 on error.
+function test_ose_env() {
+
+  local out
+
+  echo "*** Validating ose-master ($MASTER)..."
+  echo
+
+  ssh $MASTER "oc login -u admin -p ignored && oc project"
+  (( $? != 0 )) && return 1
+  
+  echo
+  out="$(ssh $MASTER "oc get nodes")"
+  if grep -q NotReady <<<"$out" ; then
+    echo -e "ERROR: 1 or more nodes are not ready:\n$out"
+    return 1
+  fi
+
+  echo
+  echo "... validated"
+  echo
+  return 0
+}
+
+# returns 0 if the passed-in pod is running. Echos "oc get pod" output for all
+# errors.
+# $1= pod-name
+function verify_new_pod() {
+
+  local pod="$1"
+  local i; local MAX=3 # num tries
+  local SLEEP=3 # seconds
+  local out
+
+  for ((i=0; i<$MAX; i++)); do
+     sleep $SLEEP
+     out="$(ssh $MASTER "oc get pod $pod")"
+     (( $? != 0 )) && {
+       echo $out; return 1; }
+     if grep Running <<<$out ; then
+       return 0
+     fi
+  done
+
+  echo $out
+  return 1
+}
+
+# the various "test" function are below. The general approach, in order to not
+# need separate yaml files for each test's pod spec, is to supply the yaml as
+# stdin to the oc create -f command.  Eg:
+#   cat <<END | oc create -f -
+#     <yaml here...>
+#   END
+#
+# The tests below are based on this doc:
+#   https://mojo.redhat.com/docs/DOC-1050225
+
+# run the "general" tests.
+function general_test() {
+
+  local pod
+
+  # General Test 2:
+  #
+
+  pod='nginx-pod3'
+  cat <<END | ssh $MASTER "oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+    - name: $pod
+      image: fedora/nginx
+      ports:
+        - name: web
+          containerPort: 80
+  securityContext:
+      supplementalGroups: ['100003']
+END
+
+  if ! validate_new_pod $pod ; then
+    echo "ERROR: general test #2"
+    return 1
+  fi
+
+  return 0
+}
+
+# execute the passed-in test(s).
+# $@= list of 1 or more tests (space separator)
+function execute_tests() {
+
+  local tests="$@"
+  local test; local errcnt=0
+
+  echo "*** Executing test(s)..."
+  for test in $tests; do
+     echo
+     echo "    Test: $test:"
+
+     case "$test" in
+        general)
+          general_test || ((errcnt++))
+        ;;
+
+        nfs)
+          nfs_test || ((errcnt++))
+        ;;
+
+        gluster)
+          gluster_test || ((errcnt++))
+        ;;
+
+        rbd)
+          rbd_test || ((errcnt++))
+        ;;
+
+        *)
+          echo "ERROR: unknown test \"$test\"" && ((errcnt++))
+        ;;
+     esac
+  done
+
+  echo
+  echo "... done with tests: $errcnt errors"
+  echo
+
+  (( errcnt > 0 )) && return 1
+  return 0
+}
+
+
+
+## main ##
+
+parse_cmd $@ || exit -1
+
+echo
+if (( VERIFY_ONLY )) ; then
+  echo "*** Only validating the environment on ose-master \"$MASTER\""
+else
+  (( NUM_TESTS > 1 )) && plural='s' || plural=''
+  echo "*** Will run $NUM_TESTS test$plural on ose-master \"$MASTER\":"
+  for test in ${TESTS[@]}; do
+     echo "       $test"
+  done
+fi
+echo
+
+test_ose_env || exit 1
+
+if (( ! VERIFY_ONLY )) ; then
+  sleep 2
+  execute_tests ${TESTS[@]} || exit 1
+fi
+
+exit 0
