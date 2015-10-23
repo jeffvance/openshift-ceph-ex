@@ -192,10 +192,10 @@ function general_test() {
 
   local pod
 
-  # General Test 2:
+  # General Test 2: emptyDir plugin.
   #
 
-  pod='nginx-pod3'
+  pod='bb-general-pod2'
   cat <<END | ssh $MASTER "oc create -f -"
 apiVersion: v1
 kind: Pod
@@ -205,13 +205,12 @@ metadata:
     name: $pod
 spec:
   containers:
-    - name: $pod
-      image: fedora/nginx
-      ports:
-        - name: web
-          containerPort: 80
+  - name: $pod
+    image: busybox
+    command: ["sleep", "60000"]
   securityContext:
-      supplementalGroups: ['100003']
+    supplementalGroups: ['100003']
+    privileged: false
 END
 
   if ! validate_new_pod $pod ; then
