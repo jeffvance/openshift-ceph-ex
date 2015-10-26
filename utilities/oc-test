@@ -170,7 +170,7 @@ function validate_ose_env() {
 
   # oc get scc
   echo
-  out="$(ssh $MASTER "${OC_PREFIX}oc get scc | awk '{print $4}'")" #HOSTDIR col
+  out="$(ssh $MASTER "${OC_PREFIX}oc get scc | awk '{print \$4}'")" #HOSTDIR col
   if grep -q 'false' <<<"$out" ; then
     echo -e "ERROR: HOSTDIR is false:\n$out\nUse \"oc scc edit scc {privileged|restricted}\" and set allowHostDirVolumePlugin to true"
     return 1
@@ -186,17 +186,28 @@ function validate_ose_env() {
 delete_pod() {
 
   local pod=$1
-  local out
+  local i; local err; local out; local TRIES=10; local SLEEP=3
 
-  out="$(ssh $MASTER "${OC_PREFIX}oc delete pod $pod 2>&1")"
-  if (( $? != 0 )) && 
-     ! grep -q " not found" <<<"$out" ; then # unexpected err
-    echo "$out"
-    return 1
-  fi
+  # delete the target pod
+  ssh -q $MASTER "${OC_PREFIX}oc delete pod $pod >&/dev/null"
 
-  sleep 2
-  return 0
+  # wait for the delete to complete...
+  for ((i=0; i<$TRIES; i++)); do
+     sleep $SLEEP
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod 2>&1")"
+     err=$?
+     if (( err != 0 )) && 
+        grep -q " not found" <<<"$out" ; then # expected err
+       return 0
+     fi
+     if (( err != 0 )) ; then # unexpected
+       echo "$out"
+       return 1
+     fi
+  done
+
+  echo -e "ERROR: $TRIES tries attempted to delete pod \"$pod\":\n$out"
+  return 1
 }
 
 # returns 0 if the passed-in pod is running. Echos "oc get pod" output for all
@@ -206,17 +217,16 @@ function verify_new_pod() {
 
   local pod="$1"
   local i; local MAX=3 # num tries
-  local SLEEP=3 # seconds
-  local out
+  local SLEEP=3; local out
 
   for ((i=0; i<$MAX; i++)); do
      sleep $SLEEP
-     out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod")"
-     (( $? != 0 )) && {
-       echo $out; return 1; }
-     if grep Running <<<$out ; then
-       return 0
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod 2>&1")"
+     if (( $? != 0 )) ; then
+       echo "$out"
+       return 1
      fi
+     grep -q Running <<<$out && return 0
   done
 
   echo "ERROR: $MAX tries attempted to start pod \"$pod\": $out"
@@ -239,9 +249,9 @@ function general_test() {
   local pod; local out; local err
 
   #
-  # General Test 2: emptyDir plugin.
+  # General Test 2: emptyDir
 
-  pod='bb-general-pod2'
+  pod='general-pod2'
   delete_pod $pod
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
@@ -269,7 +279,7 @@ END
   #
   # General Test 3: hostDir plugin.
 
-  pod='bb-general-pod3'
+  pod='general-pod3'
   delete_pod $pod
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
@@ -300,7 +310,6 @@ END
     echo "ERROR: general test #3"
     return 1
   fi
-
 
   return 0
 }
