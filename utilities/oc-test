@@ -11,6 +11,7 @@ VERIFY_ONLY=0 # false
 ALL_TESTS='general,nfs,gluster,rbd'
 TESTS='general' # default
 MASTER="$HOSTNAME"
+OC_PREFIX=''
 
 
 ## functions ##
@@ -39,6 +40,9 @@ DESCRIPTION
   --verify   Only test the ose enviromment but don't run any tests.
   --master <node>
              Hostname or ip of the ose-master node, default is local host
+  --oc-prefix [path]
+             An optional path prefix appended to all "oc" commands, eg.
+             "/root/origin/_output/local/bin/linux/amd64" for local ose builds.
   --version  Show the version string.
 
 END
@@ -72,7 +76,7 @@ function parse_tests() {
 function parse_cmd() {
 
   local errcnt=0
-  local long_opts='version,master:,verify'
+  local long_opts='version,master:,verify,oc-prefix:'
 
   if (( $# == 0 )) ; then
     usage && exit -1
@@ -94,6 +98,11 @@ function parse_cmd() {
 
         --master)
           MASTER="$2"
+          shift 2; continue
+        ;;
+
+        --oc-prefix)
+          OC_PREFIX="$2"
           shift 2; continue
         ;;
 
@@ -126,6 +135,16 @@ function parse_cmd() {
   TESTS=($TESTS)  # array
   NUM_TESTS=${#TESTS[@]}
 
+  if [[ -n "$OC_PREFIX" ]] ; then
+    # oc prefix must end in a '/'
+    [[ "$OC_PREFIX" != */ ]] && OC_PREFIX="$OC_PREFIX/"
+    # make sure oc prefix exists as a dir on the master node
+    if ! ssh $MASTER "[[ -d $OC_PREFIX ]]" ; then
+      echo "ERROR: no directory named \"$OC_PREFIX\" on master node ($MASTER)"
+      return 1
+    fi
+  fi
+
   return 0
 }
 
@@ -137,11 +156,12 @@ function test_ose_env() {
   echo "*** Validating ose-master ($MASTER)..."
   echo
 
-  ssh $MASTER "oc login -u admin -p ignored && oc project"
+  ssh $MASTER "${OC_PREFIX}oc login -u admin -p ignored &&
+               ${OC_PREFIX}oc project"
   (( $? != 0 )) && return 1
   
   echo
-  out="$(ssh $MASTER "oc get nodes")"
+  out="$(ssh $MASTER "${OC_PREFIX}oc get nodes")"
   if grep -q NotReady <<<"$out" ; then
     echo -e "ERROR: 1 or more nodes are not ready:\n$out"
     return 1
@@ -150,6 +170,19 @@ function test_ose_env() {
   echo
   echo "... validated"
   echo
+  return 0
+}
+
+# deletes the passed-in pod.
+delete_pod() {
+
+  local pod=$1
+  local out; local err
+
+  out="$(ssh $MASTER "${OC_PREFIX}oc delete pod $pod")"
+  err=$?
+  (( err != 0 )) && echo "$out"
+  sleep 2
   return 0
 }
 
@@ -165,7 +198,7 @@ function verify_new_pod() {
 
   for ((i=0; i<$MAX; i++)); do
      sleep $SLEEP
-     out="$(ssh $MASTER "oc get pod $pod")"
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod")"
      (( $? != 0 )) && {
        echo $out; return 1; }
      if grep Running <<<$out ; then
@@ -173,11 +206,11 @@ function verify_new_pod() {
      fi
   done
 
-  echo $out
+  echo "ERROR: $MAX tries attempted to start pod \"$pod\": $out"
   return 1
 }
 
-# the various "test" function are below. The general approach, in order to not
+# the various "test" functions are below. The general approach, in order to not
 # need separate yaml files for each test's pod spec, is to supply the yaml as
 # stdin to the oc create -f command.  Eg:
 #   cat <<END | oc create -f -
@@ -190,13 +223,15 @@ function verify_new_pod() {
 # run the "general" tests.
 function general_test() {
 
-  local pod
+  local pod; local out; local err
 
-  # General Test 2: emptyDir plugin.
   #
+  # General Test 2: emptyDir plugin.
 
   pod='bb-general-pod2'
-  cat <<END | ssh $MASTER "oc create -f -"
+  delete_pod $pod
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: Pod
 metadata:
@@ -209,14 +244,65 @@ spec:
     image: busybox
     command: ["sleep", "60000"]
   securityContext:
-    supplementalGroups: ['100003']
+    supplementalGroups: [$SGID]
     privileged: false
 END
 
-  if ! validate_new_pod $pod ; then
+  if ! verify_new_pod $pod ; then
     echo "ERROR: general test #2"
     return 1
   fi
+
+  #
+  # General Test 3: hostDir plugin.
+
+  pod='bb-general-pod3'
+  delete_pod $pod
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+  - name: $pod
+    image: busybox
+    command: ["sleep", "60000"]
+    volumeMounts:
+    - name: bb-vol
+      mountPath: /usr/share/busybox
+  securityContext:
+    supplementalGroups: [$SGID]
+    privileged: false
+  volumes:
+  - name: bb-vol
+    hostPath:
+      path: /opt/data
+END
+
+  if ! verify_new_pod $pod ; then
+    echo "ERROR: general test #3"
+    return 1
+  fi
+
+
+  return 0
+}
+
+# outputs the starting SGID for the "default" namespace
+function get_supplemental_group_id() {
+
+  local out
+
+  out="$(ssh $MASTER "${OC_PREFIX}oc get ns -o yaml |
+           grep \"name: default\" -B6               |
+           grep \"openshift.io/sa.scc.supplemental-groups:\"")"
+
+  out="${out#*:}"   # keep the starting id and increment
+  echo "${out%/*}" # the starting id
 
   return 0
 }
@@ -229,6 +315,8 @@ function execute_tests() {
   local test; local errcnt=0
 
   echo "*** Executing test(s)..."
+  echo "    Using supplemental group ID: $SGID"
+
   for test in $tests; do
      echo
      echo "    Test: $test:"
@@ -286,6 +374,7 @@ test_ose_env || exit 1
 
 if (( ! VERIFY_ONLY )) ; then
   sleep 2
+  SGID=$(get_supplemental_group_id)
   execute_tests ${TESTS[@]} || exit 1
 fi
 
