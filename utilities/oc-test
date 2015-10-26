@@ -148,8 +148,8 @@ function parse_cmd() {
   return 0
 }
 
-# test ose env on passed-in node. Return 1 on error.
-function test_ose_env() {
+# validate openshift env on passed-in node. Return 1 on error.
+function validate_ose_env() {
 
   local out
 
@@ -160,10 +160,19 @@ function test_ose_env() {
                ${OC_PREFIX}oc project"
   (( $? != 0 )) && return 1
   
+  # oc get nodes
   echo
   out="$(ssh $MASTER "${OC_PREFIX}oc get nodes")"
   if grep -q NotReady <<<"$out" ; then
     echo -e "ERROR: 1 or more nodes are not ready:\n$out"
+    return 1
+  fi
+
+  # oc get scc
+  echo
+  out="$(ssh $MASTER "${OC_PREFIX}oc get scc | awk '{print $4}'")" #HOSTDIR col
+  if grep -q 'false' <<<"$out" ; then
+    echo -e "ERROR: HOSTDIR is false:\n$out\nUse \"oc scc edit scc {privileged|restricted}\" and set allowHostDirVolumePlugin to true"
     return 1
   fi
 
@@ -177,11 +186,15 @@ function test_ose_env() {
 delete_pod() {
 
   local pod=$1
-  local out; local err
+  local out
 
-  out="$(ssh $MASTER "${OC_PREFIX}oc delete pod $pod")"
-  err=$?
-  (( err != 0 )) && echo "$out"
+  out="$(ssh $MASTER "${OC_PREFIX}oc delete pod $pod 2>&1")"
+  if (( $? != 0 )) && 
+     ! grep -q " not found" <<<"$out" ; then # unexpected err
+    echo "$out"
+    return 1
+  fi
+
   sleep 2
   return 0
 }
@@ -370,7 +383,7 @@ else
 fi
 echo
 
-test_ose_env || exit 1
+validate_ose_env || exit 1
 
 if (( ! VERIFY_ONLY )) ; then
   sleep 2
