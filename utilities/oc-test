@@ -43,6 +43,9 @@ DESCRIPTION
   --oc-prefix [path]
              An optional path prefix appended to all "oc" commands, eg.
              "/root/origin/_output/local/bin/linux/amd64" for local ose builds.
+  --nfs-server <hostname|ip>
+             NFS server's hostname or ip. Required if performing the nfs tests,
+             otherwise ignored.
   --version  Show the version string.
 
 END
@@ -76,11 +79,9 @@ function parse_tests() {
 function parse_cmd() {
 
   local errcnt=0
-  local long_opts='version,master:,verify,oc-prefix:'
+  local long_opts='version,master:,verify,oc-prefix:,nfs-server:'
 
-  if (( $# == 0 )) ; then
-    usage && exit -1
-  fi
+  (( $# == 0 )) && usage && exit -1
 
   eval set -- "$(getopt -o 'y' --long $long_opts -- $@)"
 
@@ -103,6 +104,11 @@ function parse_cmd() {
 
         --oc-prefix)
           OC_PREFIX="$2"
+          shift 2; continue
+        ;;
+
+        --nfs-server)
+          NFS="$2"
           shift 2; continue
         ;;
 
@@ -135,6 +141,7 @@ function parse_cmd() {
   TESTS=($TESTS)  # array
   NUM_TESTS=${#TESTS[@]}
 
+  # --oc-prefix:
   if [[ -n "$OC_PREFIX" ]] ; then
     # oc prefix must end in a '/'
     [[ "$OC_PREFIX" != */ ]] && OC_PREFIX="$OC_PREFIX/"
@@ -142,6 +149,15 @@ function parse_cmd() {
     if ! ssh $MASTER "[[ -d $OC_PREFIX ]]" ; then
       echo "ERROR: no directory named \"$OC_PREFIX\" on master node ($MASTER)"
       return 1
+    fi
+  fi
+
+  # --nfs-server:
+  if [[ "${TESTS[@]}" =~ nfs ]] ; then # nfs test requested
+    if [[ -z "$NFS" ]] ; then
+      echo "ERROR: missing nfs server argument"
+      echo
+      usage && return 1
     fi
   fi
 
@@ -229,7 +245,7 @@ function verify_new_pod() {
      grep -q Running <<<$out && return 0
   done
 
-  echo "ERROR: $MAX tries attempted to start pod \"$pod\": $out"
+  echo -e "ERROR: $MAX tries attempted to start pod \"$pod\":\n$out"
   return 1
 }
 
@@ -271,10 +287,8 @@ spec:
     privileged: false
 END
 
-  if ! verify_new_pod $pod ; then
-    echo "ERROR: general test #2"
-    return 1
-  fi
+  verify_new_pod $pod || {
+    echo "ERROR: general test #2"; return 1; }
 
   #
   # General Test 3: hostDir plugin.
@@ -306,10 +320,52 @@ spec:
       path: /opt/data
 END
 
-  if ! verify_new_pod $pod ; then
-    echo "ERROR: general test #3"
-    return 1
-  fi
+  verify_new_pod $pod || {
+    echo "ERROR: general test #3"; return 1; }
+
+  return 0
+}
+
+# run the "nfs" tests.
+function nfs_test() {
+
+  local pod; local out; local err
+
+  #
+  # NFS Test 1: nfs plugin
+
+  pod='nfs-pod1'
+  delete_pod $pod
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+  - name: $pod
+    image: fedora/nginx
+    ports:
+    - name: web
+      containerPort: 80
+    volumeMounts:
+    - name: nfsvol
+      mountPath: /usr/share/nginx/html/test
+  securityContext:
+      privileged: false
+  volumes:
+  - name: nfsvol
+    nfs:
+      path: "/opt/nfs"
+      server: $NFS
+      readOnly: false
+END
+
+  verify_new_pod $pod || {
+    echo "ERROR: nfs test #1"; return 1; }
 
   return 0
 }
@@ -395,7 +451,6 @@ echo
 validate_ose_env || exit 1
 
 if (( ! VERIFY_ONLY )) ; then
-  sleep 2
   SGID=$(get_supplemental_group_id)
   execute_tests ${TESTS[@]} || exit 1
 fi
