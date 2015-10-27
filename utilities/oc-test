@@ -263,8 +263,9 @@ function general_test() {
 
   local pod; local out; local err
 
-  #
-  # General Test 2: emptyDir
+  echo
+  echo "----------"
+  echo "General Test 2: Busybox, emptyDir, SGID $SGID:"
 
   pod='general-pod2'
   delete_pod $pod
@@ -289,8 +290,9 @@ END
   verify_new_pod $pod || {
     echo "ERROR: general test #2"; return 1; }
 
-  #
-  # General Test 3: hostDir plugin.
+  echo
+  echo "----------"
+  echo "General Test 3: Busybox, hostDir plugin, SGID $SGID:"
 
   pod='general-pod3'
   delete_pod $pod
@@ -331,8 +333,9 @@ function nfs_test() {
   local pod; local out; local err
   local vol_mount='/opt/nfs'
 
-  #
-  # NFS Test 1: nfs plugin
+  echo
+  echo "----------"
+  echo "NFS Test 1: nginx, nfs plugin:"
 
   mkdir -p $vol_mount # in case...
 
@@ -374,8 +377,9 @@ END
     return 1
   fi
 
-  #
-  # NFS Test 2: nfs plugin with SGID
+  echo
+  echo "----------"
+  echo "NFS Test 2: nginx, nfs plugin, SGID $SGID:"
 
   pod='nfs-pod2'
   delete_pod $pod
