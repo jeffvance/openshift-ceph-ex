@@ -164,6 +164,21 @@ function parse_cmd() {
   return 0
 }
 
+# outputs the starting SGID for the "default" namespace
+function get_supplemental_group_id() {
+
+  local out
+
+  out="$(ssh $MASTER "${OC_PREFIX}oc get ns -o yaml |
+           grep \"name: default\" -B6               |
+           grep \"openshift.io/sa.scc.supplemental-groups:\"")"
+
+  out="${out#*:}"   # keep the starting id and increment
+  echo "${out%/*}" # the starting id
+
+  return 0
+}
+
 # validate openshift env on passed-in node. Return 1 on error.
 function validate_ose_env() {
 
@@ -199,7 +214,7 @@ function validate_ose_env() {
 }
 
 # deletes the passed-in pod.
-delete_pod() {
+function delete_pod() {
 
   local pod=$1
   local i; local err; local out; local TRIES=10; local SLEEP=3
@@ -227,6 +242,64 @@ delete_pod() {
   return 1
 }
 
+# deletes the passed-in pvc (claim).
+function delete_pvc() {
+
+  local pvc=$1
+  local i; local err; local out; local TRIES=3; local SLEEP=3
+
+  # delete the target pvc
+  echo "... deleting pvc \"$pvc\" (if it exists)..."
+  ssh -q $MASTER "${OC_PREFIX}oc delete pvc $pvc >&/dev/null"
+
+  # wait for the delete to complete...
+  for ((i=0; i<$TRIES; i++)); do
+     sleep $SLEEP
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pvc $pvc 2>&1")"
+     err=$?
+     if (( err != 0 )) && 
+        grep -q " not found" <<<"$out" ; then # expected err
+       return 0
+     fi
+     if (( err != 0 )) ; then # unexpected
+       echo "$out"
+       return 1
+     fi
+  done
+
+  echo -e "ERROR: $TRIES tries attempted to delete pvc \"$pvc\":\n$out"
+  return 1
+}
+
+# deletes the passed-in pv (Persistent Volume).
+function delete_pv() {
+
+  local pv=$1
+  local i; local err; local out; local TRIES=3; local SLEEP=3
+
+  # delete the target pv
+  echo "... deleting pv \"$pv\" (if it exists)..."
+  ssh -q $MASTER "${OC_PREFIX}oc delete pv $pv >&/dev/null"
+
+  # wait for the delete to complete...
+  for ((i=0; i<$TRIES; i++)); do
+     sleep $SLEEP
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pv $pv 2>&1")"
+     err=$?
+     if (( err != 0 )) && 
+        grep -q " not found" <<<"$out" ; then # expected err
+       return 0
+     fi
+     if (( err != 0 )) ; then # unexpected
+       echo "$out"
+       return 1
+     fi
+  done
+
+  echo -e "ERROR: $TRIES tries attempted to delete pv \"$pv\":\n$out"
+  return 1
+}
+
 # returns 0 if the passed-in pod is running. Echos "oc get pod" output for all
 # errors.
 # $1= pod-name
@@ -248,6 +321,48 @@ function verify_new_pod() {
   done
 
   echo -e "ERROR: $(((MAX*SLEEP))) seconds waiting for pod \"$pod\" to start:\n$out"
+  return 1
+}
+
+# returns 0 if the passed-in PV is running.
+function verify_new_pv() {
+
+  local pv="$1"
+  local i; local TRIES=3; local SLEEP=3; local out
+
+  echo "... checking PV \"$pv\" ..."
+
+  for ((i=0; i<$TRIES; i++)); do
+     sleep $SLEEP
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pv $pv 2>&1 |
+            awk '{print \$5}'")" # just the STATUS column
+     (( $? != 0 )) && { 
+       echo "$out"; return 1; }
+     grep -q 'Available' <<<"$out" && return 0
+  done
+
+  echo -e "ERROR: $(((TRIES*SLEEP))) seconds waiting for PV \"$pv\" to start:\n$out"
+  return 1
+}
+
+# returns 0 if the passed-in PVC is running.
+function verify_new_pvc() {
+
+  local pvc="$1"
+  local i; local TRIES=3; local SLEEP=3; local out
+
+  echo "... checking PVC \"$pvc\" ..."
+
+  for ((i=0; i<$TRIES; i++)); do
+     sleep $SLEEP
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pvc $pvc 2>&1 |
+            awk '{print \$3}'")" # just the STATUS column
+     (( $? != 0 )) && { 
+       echo "$out"; return 1; }
+     grep -q 'Bound' <<<"$out" && return 0
+  done
+
+  echo -e "ERROR: $(((TRIES*SLEEP))) seconds waiting for PVC \"$pvc\" to start:\n$out"
   return 1
 }
 
@@ -378,6 +493,7 @@ END
     return 1
   fi
 
+
   echo
   echo "----------"
   echo "NFS Test 2: busybox, nfs plugin, SGID $SGID:"
@@ -414,20 +530,83 @@ END
   verify_new_pod $pod || {
     echo "ERROR: nfs test #2"; return 1; }
 
-  return 0
-}
 
-# outputs the starting SGID for the "default" namespace
-function get_supplemental_group_id() {
+  echo
+  echo "----------"
+  echo "NFS Test 3: busybox, nfs, PV, PVC, SGID $SGID:"
 
-  local out
+  pod='nfs-pod3'
+  pv='nfs-pv'
+  pvc='nfs-pvc'
 
-  out="$(ssh $MASTER "${OC_PREFIX}oc get ns -o yaml |
-           grep \"name: default\" -B6               |
-           grep \"openshift.io/sa.scc.supplemental-groups:\"")"
+  # cleanup
+  delete_pod $pod
+  delete_pvc $pvc
+  delete_pv $pv
 
-  out="${out#*:}"   # keep the starting id and increment
-  echo "${out%/*}" # the starting id
+  # a. create PV
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  nfs:
+    path: $vol_mount
+    server: $NFS
+END
+
+  verify_new_pv $pv || {
+    echo "ERROR: nfs test #3: can't create PV"; return 1; }
+
+  # b. create PVC
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+     requests:
+       storage: 1Gi
+END
+
+  verify_new_pvc $pvc || {
+    echo "ERROR: nfs test #3: can't create PVC"; return 1; }
+
+  # c. create pod using claim
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+  - name: $pod
+    image: busybox
+    command: ["sleep", "60000"]
+    volumeMounts:
+    - name: nfs-vol3
+      mountPath: /usr/share/busybox
+  securityContext:
+    supplementalGroups: [$SGID]
+    privileged: false
+  volumes:
+  - name: nfs-vol3
+    persistentVolumeClaim:
+      claimName: $pvc
+END
+
+  verify_new_pod $pod || {
+    echo "ERROR: nfs test #3"; return 1; }
 
   return 0
 }
@@ -440,7 +619,6 @@ function execute_tests() {
   local test; local errcnt=0
 
   echo "*** Executing tests ..."
-  echo "    Using supplemental group ID: $SGID"
 
   for test in $tests; do
      echo
@@ -476,7 +654,6 @@ function execute_tests() {
   (( errcnt > 0 )) && return 1
   return 0
 }
-
 
 
 ## main ##
