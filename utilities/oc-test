@@ -381,6 +381,12 @@ function general_test() {
 
   local pod; local out; local err
 
+  echo "*** General test suite ***"
+  echo
+  echo "   These tests test that SGID $SGID works in emptyDir and"
+  echo "   in hostPath. No PVs or claims are used."
+  sleep 2
+
   echo
   echo "----------"
   echo "General Test 2: busybox, emptyDir, SGID $SGID:"
@@ -451,6 +457,23 @@ function nfs_test() {
   local pod; local out; local err
   local vol_mount='/opt/nfs'
 
+  echo "*** NFS test suite ***"
+  echo
+  echo "   Remember to open port 2049 on the NFS server \"$NFS\"."
+  echo "   A good test for this is, from the openshift node \"$MASTER\","
+  echo "   execute:"
+  echo "      \$ telnet $NFS 2049  # ctrl-c to exit"
+  echo "   To open port 2049, on the NFS server, execute:"
+  echo "      \$ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT"
+  echo "   On the NFS server, edit /etc/exports to include /opt/nfs, eg:"
+  echo "      /opt/nfs *(rw,sync,no_root_squash)"
+  echo "   Also, on the NFS server, ensure that Group $SGID has"
+  echo "   access to /opt/nfs. If not then execute:"
+  echo "      \$ chgrp $SGID /opt/nfs && chmod g+srw /opt/nfs"
+  echo "   It may necessary to restart NFS:"
+  echo "      \$ systemctl restart rpcbind nfs"
+  sleep 2
+
   echo
   echo "----------"
   echo "NFS Test 1: busybox, nfs plugin:"
@@ -487,12 +510,11 @@ END
 
   if ! verify_new_pod $pod ; then
     echo "ERROR: nfs test #1"
-    echo "       Try restarting rpcbind and nfs on the nfs server $NFS"
-    echo "       Also make sure port 2049 on the nfs server is open, eg."
+    echo "       Try restarting rpcbind and nfs on the nfs server \"$NFS\"."
+    echo "       Also make sure that port 2049 on the NFS server is open, eg:"
     echo "         iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT"
     return 1
   fi
-
 
   echo
   echo "----------"
@@ -529,7 +551,6 @@ END
 
   verify_new_pod $pod || {
     echo "ERROR: nfs test #2"; return 1; }
-
 
   echo
   echo "----------"
