@@ -236,12 +236,15 @@ function verify_new_pod() {
   local i; local MAX=10 # num tries
   local SLEEP=4; local out
 
+  echo "... checking pod \"$pod\" ..."
+
   for ((i=0; i<$MAX; i++)); do
      sleep $SLEEP
-     out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod 2>&1")"
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod 2>&1 |
+            awk '{print \$2}'")" # just the READY column
      (( $? != 0 )) && { 
        echo "$out"; return 1; }
-     grep -q Running <<<"$out" && return 0
+     grep -q '1/1' <<<"$out" && return 0
   done
 
   echo -e "ERROR: $(((MAX*SLEEP))) seconds waiting for pod \"$pod\" to start:\n$out"
@@ -265,7 +268,7 @@ function general_test() {
 
   echo
   echo "----------"
-  echo "General Test 2: Busybox, emptyDir, SGID $SGID:"
+  echo "General Test 2: busybox, emptyDir, SGID $SGID:"
 
   pod='general-pod2'
   delete_pod $pod
@@ -292,7 +295,7 @@ END
 
   echo
   echo "----------"
-  echo "General Test 3: Busybox, hostDir plugin, SGID $SGID:"
+  echo "General Test 3: busybox, hostDir plugin, SGID $SGID:"
 
   pod='general-pod3'
   delete_pod $pod
@@ -335,7 +338,7 @@ function nfs_test() {
 
   echo
   echo "----------"
-  echo "NFS Test 1: nginx, nfs plugin:"
+  echo "NFS Test 1: busybox, nfs plugin:"
 
   mkdir -p $vol_mount # in case...
 
@@ -352,17 +355,15 @@ metadata:
 spec:
   containers:
   - name: $pod
-    image: fedora/nginx
-    ports:
-    - name: web
-      containerPort: 80
+    image: busybox
+    command: ["sleep", "60000"]
     volumeMounts:
-    - name: nfsvol
-      mountPath: /usr/share/nginx/html/test
+    - name: nfs-vol1
+      mountPath: /usr/share/busybox
   securityContext:
       privileged: false
   volumes:
-  - name: nfsvol
+  - name: nfs-vol1
     nfs:
       path: "$vol_mount"
       server: $NFS
@@ -379,7 +380,7 @@ END
 
   echo
   echo "----------"
-  echo "NFS Test 2: nginx, nfs plugin, SGID $SGID:"
+  echo "NFS Test 2: busybox, nfs plugin, SGID $SGID:"
 
   pod='nfs-pod2'
   delete_pod $pod
@@ -393,23 +394,21 @@ metadata:
     name: $pod
 spec:
   containers:
-    - name: $pod
-      image: fedora/nginx
-      ports:
-        - name: web
-          containerPort: 80
-      volumeMounts:
-        - name: nfsvol
-          mountPath: /usr/share/nginx/html/test
+  - name: $pod
+    image: busybox
+    command: ["sleep", "60000"]
+    volumeMounts:
+    - name: nfs-vol2
+      mountPath: /usr/share/busybox
   securityContext:
-      supplementalGroups: [$SGID]
-      privileged: false
+    supplementalGroups: [$SGID]
+    privileged: false
   volumes:
-    - name: nfsvol
-      nfs:
-        path: "$vol_mount"
-        server: $NFS
-        readOnly: false
+  - name: nfs-vol2
+    nfs:
+      path: "$vol_mount"
+      server: $NFS
+      readOnly: false
 END
 
   verify_new_pod $pod || {
