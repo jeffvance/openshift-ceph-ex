@@ -205,6 +205,7 @@ delete_pod() {
   local i; local err; local out; local TRIES=10; local SLEEP=3
 
   # delete the target pod
+  echo "... deleting pod \"$pod\" (if it exists)..."
   ssh -q $MASTER "${OC_PREFIX}oc delete pod $pod >&/dev/null"
 
   # wait for the delete to complete...
@@ -232,20 +233,18 @@ delete_pod() {
 function verify_new_pod() {
 
   local pod="$1"
-  local i; local MAX=3 # num tries
-  local SLEEP=3; local out
+  local i; local MAX=10 # num tries
+  local SLEEP=4; local out
 
   for ((i=0; i<$MAX; i++)); do
      sleep $SLEEP
      out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod 2>&1")"
-     if (( $? != 0 )) ; then
-       echo "$out"
-       return 1
-     fi
-     grep -q Running <<<$out && return 0
+     (( $? != 0 )) && { 
+       echo "$out"; return 1; }
+     grep -q Running <<<"$out" && return 0
   done
 
-  echo -e "ERROR: $MAX tries attempted to start pod \"$pod\":\n$out"
+  echo -e "ERROR: $(((MAX*SLEEP))) seconds waiting for pod \"$pod\" to start:\n$out"
   return 1
 }
 
@@ -330,9 +329,12 @@ END
 function nfs_test() {
 
   local pod; local out; local err
+  local vol_mount='/opt/nfs'
 
   #
   # NFS Test 1: nfs plugin
+
+  mkdir -p $vol_mount # in case...
 
   pod='nfs-pod1'
   delete_pod $pod
@@ -359,13 +361,55 @@ spec:
   volumes:
   - name: nfsvol
     nfs:
-      path: "/opt/nfs"
+      path: "$vol_mount"
       server: $NFS
       readOnly: false
 END
 
+  if ! verify_new_pod $pod ; then
+    echo "ERROR: nfs test #1"
+    echo "       Try restarting rpcbind and nfs on the nfs server $NFS"
+    echo "       Also make sure port 2049 on the nfs server is open, eg."
+    echo "         iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT"
+    return 1
+  fi
+
+  #
+  # NFS Test 2: nfs plugin with SGID
+
+  pod='nfs-pod2'
+  delete_pod $pod
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+    - name: $pod
+      image: fedora/nginx
+      ports:
+        - name: web
+          containerPort: 80
+      volumeMounts:
+        - name: nfsvol
+          mountPath: /usr/share/nginx/html/test
+  securityContext:
+      supplementalGroups: [$SGID]
+      privileged: false
+  volumes:
+    - name: nfsvol
+      nfs:
+        path: "$vol_mount"
+        server: $NFS
+        readOnly: false
+END
+
   verify_new_pod $pod || {
-    echo "ERROR: nfs test #1"; return 1; }
+    echo "ERROR: nfs test #2"; return 1; }
 
   return 0
 }
@@ -392,7 +436,7 @@ function execute_tests() {
   local tests="$@"
   local test; local errcnt=0
 
-  echo "*** Executing test(s)..."
+  echo "*** Executing tests ..."
   echo "    Using supplemental group ID: $SGID"
 
   for test in $tests; do
