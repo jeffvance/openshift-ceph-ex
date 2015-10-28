@@ -576,23 +576,25 @@ END
 # run the "nfs" tests.
 function nfs_test() {
 
-  local pod; local vol_mount='/opt/nfs'
+  local pod; local pv; local pvc
+  local vol_mount='/opt/nfs'
 
-  echo "*** NFS test suite ***"
-  echo
-  echo "   Remember to open port 2049 on the NFS server \"$NFS\"."
-  echo "   A good test for this is, from the openshift node \"$MASTER\","
-  echo "   execute:"
-  echo "      \$ telnet $NFS 2049  # ctrl-c to exit"
-  echo "   To open port 2049, on the NFS server, execute:"
-  echo "      \$ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT"
-  echo "   On the NFS server, edit /etc/exports to include /opt/nfs, eg:"
-  echo "      /opt/nfs *(rw,sync,no_root_squash)"
-  echo "   Also, on the NFS server, ensure that Group $SGID has"
-  echo "   access to /opt/nfs. If not then execute:"
-  echo "      \$ chgrp $SGID /opt/nfs && chmod g+srw /opt/nfs"
-  echo "   It may necessary to restart NFS:"
-  echo "      \$ systemctl restart rpcbind nfs"
+  cat <<END_NFS
+*** NFS test suite ***
+
+    Remember to open port 2049 on the NFS server "$NFS". A good test for
+    this is, from the openshift node "$MASTER", execute:
+       $ telnet $NFS 2049  # ctrl-c to exit
+    To open port 2049, on the NFS server, execute:
+       $ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT
+    On the NFS server, edit /etc/exports to include /opt/nfs, eg:
+       /opt/nfs *(rw,sync,no_root_squash)
+    Also, on the NFS server, ensure that Group $SGID has
+    access to /opt/nfs. If not then execute:
+       $ chgrp $SGID /opt/nfs && chmod g+srw /opt/nfs
+    It may necessary to restart NFS:
+       $ systemctl restart rpcbind nfs
+END_NFS
   sleep 2
 
   echo
@@ -756,13 +758,24 @@ function gluster_test() {
 
   local pod; local node; local endpoints=''
   local endpt='gluster-endpoints'
+  local pv; local pvc
 
-  echo "*** Gluster test suite ***"
-  echo "   Uses the supplied gluster storage nodes (endpoints):"
-  for node in ${GLUSTER_NODES[@]}; do
-     echo "      $node"
-  done
-  echo "   and the glusterfs plugin to access \"$GLUSTER_VOL\"."
+  cat <<END_GLUSTER
+*** Gluster test suite ***
+
+    The supplied gluster storage nodes (endpoints) and the glusterfs plugin
+    are tested using the busybox container. On one of the gluster
+    nodes, eg. ${GLUSTER_NODES[0]}, make sure that gluster is running, that
+    the "$GLUSTER_VOL" volume is active, and that the volume mount exists. Eg:
+       $ gluster peer status
+       $ gluster volume status $GLUSTER_VOL
+       $ mount | grep glusterfs
+       # if $GLUSTER_VOL is not displayed, then:
+       $ mount -a # assuming the vol mount is present in /etc/fstab
+       # if the vol mount is not in /etc/fstab, then add it, eg:
+       ${GLUSTER_NODE[0]}:/$GLUSTER_VOL /mnt/glusterfs/$GLUSTER_VOL glusterfs _netdev 0 0
+       # and make sure the brick is mounted as well...
+END_GLUSTER
   sleep 2
 
   echo
@@ -822,11 +835,86 @@ spec:
       readOnly: false
 END
 
-  if ! verify_new_pod $pod ; then
-    echo "ERROR: gluster test #1"
-    echo "       Try ..."
-    return 1
-  fi
+  verify_new_pod $pod || {
+    echo "ERROR: gluster test #1"; return 1; }
+
+  echo
+  echo "----------"
+  echo "Gluster Test 2: busybox, PV, PVC, SGID $SGID:"
+
+  pod='gluster-pod2'
+  pv='gluster-pv'
+  pvc='gluster-pvc'
+
+  # cleanup
+  delete_pod $pod
+  delete_pvc $pvc
+  delete_pv $pv
+
+  # a. create PV
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  glusterfs:
+    endpoints: $endpt
+    path: $GLUSTER_VOL
+    readOnly: false
+END
+
+  verify_new_pv $pv || {
+    echo "ERROR: gluster test #2: can't create PV"; return 1; }
+
+  # b. create PVC
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+     requests:
+       storage: 1Gi
+END
+
+  verify_new_pvc $pvc || {
+    echo "ERROR: gluster test #2: can't create PVC"; return 1; }
+
+  # c. create pod using claim
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+  - name: $pod
+    image: busybox
+    command: ["sleep", "60000"]
+    volumeMounts:
+    - name: gluster-vol2
+      mountPath: /usr/share/busybox
+  securityContext:
+    supplementalGroups: [$SGID]
+    privileged: false
+  volumes:
+  - name: gluster-vol2
+    persistentVolumeClaim:
+      claimName: $pvc
+END
+
+  verify_new_pod $pod || {
+    echo "ERROR: gluster test #2"; return 1; }
 
   return 0
 }
