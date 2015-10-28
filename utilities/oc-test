@@ -46,6 +46,15 @@ DESCRIPTION
   --nfs-server <hostname|ip>
              NFS server's hostname or ip. Required if performing the nfs tests,
              otherwise ignored.
+  --gluster-nodes <list-of-nodes-comma-separated>
+             A list of 2 or more gluster storage node IP addresses, which
+             become the ose endpoints. Hostname are converted to IPs using
+             getent, but if DNS or /etc/hosts is not setup correctly it is
+             better to supply IPs. Required if performing the gluster tests,
+             otherwise ignored.
+  --gluster-vol <volName>
+             The name of an existing gluster/RHS volume. Required if performing
+             the gluster tests, otherwise ignored.
   --version  Show the version string.
 
 END
@@ -79,7 +88,7 @@ function parse_tests() {
 function parse_cmd() {
 
   local errcnt=0
-  local long_opts='version,master:,verify,oc-prefix:,nfs-server:'
+  local long_opts='version,master:,verify,oc-prefix:,nfs-server:,gluster-nodes:,gluster-vol:'
 
   (( $# == 0 )) && usage && exit -1
 
@@ -109,6 +118,16 @@ function parse_cmd() {
 
         --nfs-server)
           NFS="$2"
+          shift 2; continue
+        ;;
+
+        --gluster-nodes)
+          GLUSTER_NODES="$2" #comma separated list
+          shift 2; continue
+        ;;
+
+        --gluster-vol)
+          GLUSTER_VOL="$2"
           shift 2; continue
         ;;
 
@@ -161,6 +180,24 @@ function parse_cmd() {
     fi
   fi
 
+  # --gluster-nodes:
+  if [[ "${TESTS[@]}" =~ gluster ]] ; then # gluster test requested
+    if [[ -z "$GLUSTER_NODES" ]] ; then
+      echo "ERROR: missing list of gluster nodes"
+      echo
+      usage && return 1
+    fi
+    if [[ -z "$GLUSTER_VOL" ]] ; then
+      echo "ERROR: missing the gluster volume"
+      echo
+      usage && return 1
+    fi
+    GLUSTER_NODES=(${GLUSTER_NODES//,/ }) # array
+    # convert hostnames to IPs, if possible
+    GLUSTER_NODES=($(convert_host_to_ip ${GLUSTER_NODES[@]}))
+    NUM_ENDPOINTS=${#GLUSTER_NODES[@]}
+  fi
+
   return 0
 }
 
@@ -176,6 +213,42 @@ function get_supplemental_group_id() {
   out="${out#*:}"   # keep the starting id and increment
   echo "${out%/*}" # the starting id
 
+  return 0
+}
+
+# convert the passed-in list of potential hostnames to ip addresses.
+# output the list with space delimiters so it is easily made into an array.
+function convert_host_to_ip() {
+
+  local list=($*) # array
+  local ips=''; local node; local ip
+
+  # nested function: returns true (0) if the passed-in name matches an ip-addr.
+  function is_ip_addr() {
+
+    local octet='(25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])' # cannot exceed 255
+    local ipv4="^$octet\.$octet\.$octet\.$octet$"
+
+    [[ "$1" =~ $ipv4 ]] && return 0 # true
+    return 1 # false
+  }
+
+  # main #
+
+  for node in ${list[*]}; do
+     if is_ip_addr $node ; then
+       ips+="$node "
+     else
+       ip="$(getent hosts $node)" # uses dns or /etc/hosts
+       if (( $? != 0 )) || [[ -z "$ip" ]] ; then
+         ips+="$node "
+       else
+         ips+="${ip%% *} " # just ip-addr
+       fi
+     fi
+  done
+
+  echo "$ips"
   return 0
 }
 
@@ -300,6 +373,35 @@ function delete_pv() {
   return 1
 }
 
+# deletes the passed-in endpoint.
+function delete_endpoint() {
+
+  local endpt="$1"
+  local i; local err; local out; local TRIES=3; local SLEEP=2
+
+  # delete the target endpoint
+  echo "... deleting endpoint \"$endpt\" (if it exists)..."
+  ssh -q $MASTER "${OC_PREFIX}oc delete endpoints $endpt >&/dev/null"
+
+  # wait for the delete to complete...
+  for ((i=0; i<$TRIES; i++)); do
+     sleep $SLEEP
+     out="$(ssh $MASTER "${OC_PREFIX}oc get endpoints $endpt 2>&1")"
+     err=$?
+     if (( err != 0 )) && 
+        grep -q " not found" <<<"$out" ; then # expected err
+       return 0
+     fi
+     if (( err != 0 )) ; then # unexpected
+       echo "$out"
+       return 1
+     fi
+  done
+
+  echo -e "ERROR: $TRIES tries attempted to delete endpoint \"$endpt\":\n$out"
+  return 1
+}
+
 # returns 0 if the passed-in pod is running. Echos "oc get pod" output for all
 # errors.
 # $1= pod-name
@@ -366,6 +468,26 @@ function verify_new_pvc() {
   return 1
 }
 
+# returns 0 if the passed-in endpoint is running.
+function verify_new_endpoint() {
+
+  local endpt="$1"
+  local i; local TRIES=3; local SLEEP=3; local out
+
+  echo "... checking endpoint \"$endpt\" ..."
+
+  for ((i=0; i<$TRIES; i++)); do
+     sleep $SLEEP
+     out="$(ssh $MASTER "${OC_PREFIX}oc get endpoints $endpt 2>&1")"
+     (( $? != 0 )) && { 
+       echo "$out"; return 1; }
+     grep -q "$endpt" <<<"$out" && return 0
+  done
+
+  echo -e "ERROR: $(((TRIES*SLEEP))) seconds waiting for endpoints \"$endpt\" to start:\n$out"
+  return 1
+}
+
 # the various "test" functions are below. The general approach, in order to not
 # need separate yaml files for each test's pod spec, is to supply the yaml as
 # stdin to the oc create -f command.  Eg:
@@ -379,7 +501,7 @@ function verify_new_pvc() {
 # run the "general" tests.
 function general_test() {
 
-  local pod; local out; local err
+  local pod
 
   echo "*** General test suite ***"
   echo
@@ -454,8 +576,7 @@ END
 # run the "nfs" tests.
 function nfs_test() {
 
-  local pod; local out; local err
-  local vol_mount='/opt/nfs'
+  local pod; local vol_mount='/opt/nfs'
 
   echo "*** NFS test suite ***"
   echo
@@ -477,8 +598,6 @@ function nfs_test() {
   echo
   echo "----------"
   echo "NFS Test 1: busybox, nfs plugin:"
-
-  mkdir -p $vol_mount # in case...
 
   pod='nfs-pod1'
   delete_pod $pod
@@ -632,6 +751,86 @@ END
   return 0
 }
 
+# run the "glusterfs" tests.
+function gluster_test() {
+
+  local pod; local node; local endpoints=''
+  local endpt='gluster-endpoints'
+
+  echo "*** Gluster test suite ***"
+  echo "   Uses the supplied gluster storage nodes (endpoints):"
+  for node in ${GLUSTER_NODES[@]}; do
+     echo "      $node"
+  done
+  echo "   and the glusterfs plugin to access \"$GLUSTER_VOL\"."
+  sleep 2
+
+  echo
+  echo "----------"
+  echo "Gluster Test 1: busybox, glusterfs plugin, SGID $SGID:"
+
+  pod='gluster-pod1'
+  delete_pod $pod
+  delete_endpoint $endpt
+
+  # a. create endpoints
+  for node in ${GLUSTER_NODES[@]}; do # need newlines
+     endpoints+="- addresses:"$'\n'
+     endpoints+="  - IP: $node"$'\n'
+     endpoints+="    ports:"$'\n'
+     endpoints+="    - port: 1"$'\n' # ignored
+     endpoints+="      protocol: TCP"$'\n'
+  done
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Endpoints
+apiVersion: v1
+metadata:
+  name: $endpt
+subsets:
+$endpoints
+END
+
+  verify_new_endpoint $endpt || {
+    echo "ERROR: gluster test #1: can't create endpoints"; return 1; }
+
+  # b. create pod
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+  - name: $pod
+    image: busybox
+    command: ["sleep", "60000"]
+    volumeMounts:
+    - name: gluster-vol1
+      mountPath: /usr/share/busybox
+  securityContext:
+    supplementalGroups: [$SGID]
+    privileged: false
+  volumes:
+  - name: gluster-vol1
+    glusterfs:
+      endpoints: $endpt
+      path: $GLUSTER_VOL
+      readOnly: false
+END
+
+  if ! verify_new_pod $pod ; then
+    echo "ERROR: gluster test #1"
+    echo "       Try ..."
+    return 1
+  fi
+
+  return 0
+}
+
 # execute the passed-in test(s).
 # $@= list of 1 or more tests (space separator)
 function execute_tests() {
@@ -643,8 +842,6 @@ function execute_tests() {
 
   for test in $tests; do
      echo
-     echo "    Test: $test:"
-
      case "$test" in
         general)
           general_test || ((errcnt++))
@@ -692,6 +889,7 @@ else
   done
 fi
 echo
+sleep 2
 
 validate_ose_env || exit 1
 
