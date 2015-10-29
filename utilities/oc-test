@@ -412,18 +412,19 @@ function delete_endpoint() {
 function verify_new_pod() {
 
   local pod="$1"
-  local i; local MAX=10 # num tries
-  local SLEEP=4; local out
+  local i; local MAX=15 # num tries
+  local SLEEP=3; local out
 
   echo "... checking pod \"$pod\" ..."
 
   for ((i=0; i<$MAX; i++)); do
      sleep $SLEEP
-     out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod 2>&1 |
-            awk '{print \$2}'")" # just the READY column
-     (( $? != 0 )) && { 
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod 2>&1")"
+     (( $? != 0 )) && {
        echo "$out"; return 1; }
-     grep -q '1/1' <<<"$out" && return 0
+     if awk '{print $2}' <<<"$out" | grep -q '1/1' ; then # READY column
+       return 0 # success
+     fi
   done
 
   echo -e "ERROR: $(((MAX*SLEEP))) seconds waiting for pod \"$pod\" to start:\n$out"
@@ -434,17 +435,18 @@ function verify_new_pod() {
 function verify_new_pv() {
 
   local pv="$1"
-  local i; local TRIES=3; local SLEEP=3; local out
+  local i; local TRIES=5; local SLEEP=3; local out
 
   echo "... checking PV \"$pv\" ..."
 
   for ((i=0; i<$TRIES; i++)); do
      sleep $SLEEP
-     out="$(ssh $MASTER "${OC_PREFIX}oc get pv $pv 2>&1 |
-            awk '{print \$5}'")" # just the STATUS column
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pv $pv 2>&1")"
      (( $? != 0 )) && { 
        echo "$out"; return 1; }
-     grep -q 'Available' <<<"$out" && return 0
+     if awk '{print $5}' <<<"$out" | grep -q 'Available' ; then # STATUS column
+       return 0 # success
+     fi
   done
 
   echo -e "ERROR: $(((TRIES*SLEEP))) seconds waiting for PV \"$pv\" to start:\n$out"
@@ -461,11 +463,12 @@ function verify_new_pvc() {
 
   for ((i=0; i<$TRIES; i++)); do
      sleep $SLEEP
-     out="$(ssh $MASTER "${OC_PREFIX}oc get pvc $pvc 2>&1 |
-            awk '{print \$3}'")" # just the STATUS column
+     out="$(ssh $MASTER "${OC_PREFIX}oc get pvc $pvc 2>&1")"
      (( $? != 0 )) && { 
        echo "$out"; return 1; }
-     grep -q 'Bound' <<<"$out" && return 0
+     if awk '{print $3}' <<<"$out" | grep -q 'Bound' ; then # STATUS column
+       return 0 # success
+     fi
   done
 
   echo -e "ERROR: $(((TRIES*SLEEP))) seconds waiting for PVC \"$pvc\" to start:\n$out"
@@ -604,7 +607,7 @@ END_NFS
 
   echo
   echo "----------"
-  echo "NFS Test 1: busybox, nfs plugin:"
+  echo "NFS Test 1: baseline: busybox, nfs plugin:"
 
   pod='nfs-pod1'
   delete_pod $pod
@@ -680,18 +683,12 @@ END
 
   echo
   echo "----------"
-  echo "NFS Test 3: busybox, nfs, PV, PVC, SGID $SGID:"
-
-  pod='nfs-pod3'
-  pv='nfs-pv'
-  pvc='nfs-pvc'
-
-  # cleanup
-  delete_pod $pod
-  delete_pvc $pvc
-  delete_pv $pv
+  echo "NFS Test 3: busybox, PV, PVC, SGID $SGID:"
 
   # a. create PV
+  pv='nfs-pv'
+  delete_pv $pv
+
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: PersistentVolume
@@ -711,6 +708,9 @@ END
     echo "ERROR: nfs test #3: can't create PV"; return 1; }
 
   # b. create PVC
+  pvc='nfs-pvc'
+  delete_pvc $pvc
+
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -728,6 +728,9 @@ END
     echo "ERROR: nfs test #3: can't create PVC"; return 1; }
 
   # c. create pod using claim
+  pod='nfs-pod3'
+  delete_pod $pod
+
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: Pod
@@ -785,13 +788,11 @@ END_GLUSTER
 
   echo
   echo "----------"
-  echo "Gluster Test 1: busybox, glusterfs plugin, SGID $SGID:"
-
-  pod='gluster-pod1'
-  delete_pod $pod
-  delete_endpoint $endpt
+  echo "Gluster Test 1: baseline: busybox, glusterfs plugin:"
 
   # a. create endpoints
+  delete_endpoint $endpt
+
   for node in ${GLUSTER_NODES[@]}; do # need newlines
      endpoints+="- addresses:"$'\n'
      endpoints+="  - IP: $node"$'\n'
@@ -814,6 +815,9 @@ END
     echo "ERROR: gluster test #1: can't create endpoints"; return 1; }
 
   # b. create pod
+  pod='gluster-pod1'
+  delete_pod $pod
+
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: Pod
@@ -829,9 +833,6 @@ spec:
     volumeMounts:
     - name: gluster-vol1
       mountPath: /usr/share/busybox
-  securityContext:
-    supplementalGroups: [$SGID]
-    privileged: false
   volumes:
   - name: gluster-vol1
     glusterfs:
@@ -845,55 +846,10 @@ END
 
   echo
   echo "----------"
-  echo "Gluster Test 2: busybox, PV, PVC, SGID $SGID:"
+  echo "Gluster Test 2: busybox, glusterfs plugin, SGID $SGID:"
 
   pod='gluster-pod2'
-  pv='gluster-pv'
-  pvc='gluster-pvc'
-
-  # cleanup
   delete_pod $pod
-  delete_pvc $pvc
-  delete_pv $pv
-
-  # a. create PV
-  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: $pv
-spec:
-  capacity:
-    storage: 1Gi
-  accessModes:
-  - ReadWriteOnce
-  glusterfs:
-    endpoints: $endpt
-    path: $GLUSTER_VOL
-    readOnly: false
-END
-
-  verify_new_pv $pv || {
-    echo "ERROR: gluster test #2: can't create PV"; return 1; }
-
-  # b. create PVC
-  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: $pvc
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-     requests:
-       storage: 1Gi
-END
-
-  verify_new_pvc $pvc || {
-    echo "ERROR: gluster test #2: can't create PVC"; return 1; }
-
-  # c. create pod using claim
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: Pod
@@ -914,12 +870,92 @@ spec:
     privileged: false
   volumes:
   - name: gluster-vol2
+    glusterfs:
+      endpoints: $endpt
+      path: $GLUSTER_VOL
+      readOnly: false
+END
+
+  verify_new_pod $pod || {
+    echo "ERROR: gluster test #1"; return 1; }
+
+  echo
+  echo "----------"
+  echo "Gluster Test 3: busybox, PV, PVC, SGID $SGID:"
+
+  # a. create PV
+  pv='gluster-pv'
+  delete_pv $pv
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteOnce
+  glusterfs:
+    endpoints: $endpt
+    path: $GLUSTER_VOL
+    readOnly: false
+END
+
+  verify_new_pv $pv || {
+    echo "ERROR: gluster test #2: can't create PV"; return 1; }
+
+  # b. create PVC
+  pvc='gluster-pvc'
+  delete_pvc $pvc
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $pvc
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+     requests:
+       storage: 1Gi
+END
+
+  verify_new_pvc $pvc || {
+    echo "ERROR: gluster test #2: can't create PVC"; return 1; }
+
+  # c. create pod using claim
+  pod='gluster-pod3'
+  delete_pod $pod
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+  - name: $pod
+    image: busybox
+    command: ["sleep", "60000"]
+    volumeMounts:
+    - name: gluster-vol3
+      mountPath: /usr/share/busybox
+  securityContext:
+    supplementalGroups: [$SGID]
+    privileged: false
+  volumes:
+  - name: gluster-vol3
     persistentVolumeClaim:
       claimName: $pvc
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: gluster test #2"; return 1; }
+    echo "ERROR: gluster test #3"; return 1; }
 
   return 0
 }
