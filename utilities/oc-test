@@ -274,9 +274,13 @@ function validate_ose_env() {
 
   # oc get scc
   echo
-  out="$(ssh $MASTER "${OC_PREFIX}oc get scc | awk '{print \$4}'")" #HOSTDIR col
-  if grep -q 'false' <<<"$out" ; then
-    echo -e "ERROR: HOSTDIR is false:\n$out\nUse \"oc scc edit scc {privileged|restricted}\" and set allowHostDirVolumePlugin to true"
+  out="$(ssh $MASTER "${OC_PREFIX}oc get scc")"
+  if awk '{print $4}' <<<"$out" | grep -q false ; then #HOSTDIR col has a false
+    echo "ERROR: HOSTDIR is false:"
+    echo "$out"
+    echo
+    echo "Use the \"oc edit scc {privileged|restricted}\" command and set"
+    echo "'allowHostDirVolumePlugin' to true."
     return 1
   fi
 
@@ -582,8 +586,9 @@ function nfs_test() {
   cat <<END_NFS
 *** NFS test suite ***
 
-    Remember to open port 2049 on the NFS server "$NFS". A good test for
-    this is, from the openshift node "$MASTER", execute:
+    The NFS plugin is pointed to the supplied NFS server to run the busybox
+    container. Remember to open port 2049 on the NFS server "$NFS". A good test
+    for this is, from the openshift node "$MASTER", execute:
        $ telnet $NFS 2049  # ctrl-c to exit
     To open port 2049, on the NFS server, execute:
        $ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT
@@ -773,7 +778,7 @@ function gluster_test() {
        # if $GLUSTER_VOL is not displayed, then:
        $ mount -a # assuming the vol mount is present in /etc/fstab
        # if the vol mount is not in /etc/fstab, then add it, eg:
-       ${GLUSTER_NODE[0]}:/$GLUSTER_VOL /mnt/glusterfs/$GLUSTER_VOL glusterfs _netdev 0 0
+       ${GLUSTER_NODES[0]}:/$GLUSTER_VOL /mnt/glusterfs/$GLUSTER_VOL glusterfs _netdev 0 0
        # and make sure the brick is mounted as well...
 END_GLUSTER
   sleep 2
