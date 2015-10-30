@@ -42,7 +42,7 @@ SYNTAX
 
 DESCRIPTION
   Verifies the ose-master environment and, optionally, executes one or more
-  storage tests from the ose-master node.
+  storage tests on the ose-master server.
 
   test-name  A list of one or more tests to run. Expected values are:
                general (default),
@@ -69,7 +69,7 @@ DESCRIPTION
              otherwise ignored.
   --gluster-nodes <list-of-nodes-comma-separated>
              A list of 2 or more gluster storage node IP addresses, which
-             become the ose endpoints. Hostname are converted to IPs using
+             become the ose endpoints. Hostnames are converted to IPs using
              getent, but if DNS or /etc/hosts is not setup correctly it is
              better to supply IPs. Required if performing the gluster tests,
              otherwise ignored.
@@ -77,6 +77,7 @@ DESCRIPTION
              The name of an existing gluster/RHS volume. Required if performing
              the gluster tests, otherwise ignored.
   --version  Show the version string.
+  -q         Suppress all prompts and reduce instructional output.
 
 END
 
@@ -122,7 +123,7 @@ function set_test_flags() {
         nfs)
           NFS_TEST=1 # true
         ;;
-        rbd)
+        rbd|ceph)
           RBD_TEST=1 # true
         ;;
      esac
@@ -136,14 +137,20 @@ function set_test_flags() {
 function parse_cmd() {
 
   local errcnt=0
+  local opts='q'
   local long_opts='version,master:,verify,oc-prefix:,nfs-server:,gluster-nodes:,gluster-vol:,sgid:'
 
   (( $# == 0 )) && usage && exit -1
 
-  eval set -- "$(getopt -o 'y' --long $long_opts -- $@)"
+  eval set -- "$(getopt -o "$opts" --long $long_opts -- $@)"
 
   while true; do
       case "$1" in
+        -q)
+          QUIET=1 # true
+          shift; continue
+        ;;
+
         --version)
           echo $VERSION
           exit 0
@@ -621,13 +628,15 @@ function general_test() {
 
   local pod
 
-  cat <<END_GENERAL
+  if (( ! QUIET )) ; then
+    cat <<END_GENERAL
 *** General test suite ***"
 
     These baseline tests test that SGID $SGID works in emptyDir and in
     hostPath. No PVs or claims are used.
 END_GENERAL
-  sleep 2
+    sleep 2
+  fi
 
   echo
   echo "----------"
@@ -737,7 +746,8 @@ function nfs_test() {
   fi
 
   # show more info for running these tests...
-  cat <<END_NFS
+  if (( ! QUIET )) ; then
+    cat <<END_NFS
 
     Busybox is run with a volume mounted to the NFS server: $NFS.
     Remember to open port 2049 on the NFS server. A good test for this is,
@@ -770,7 +780,8 @@ function nfs_test() {
 
 END_NFS
 
-  read -p "Press any key to continue..." -t120 out
+    read -p "Press any key to continue..." -t120 out
+  fi
 
   echo
   echo "----------"
@@ -931,17 +942,18 @@ END
 # run the "glusterfs" tests.
 function gluster_test() {
 
-  local pod; local node; local endpoints=''
-  local endpt='gluster-endpoints'
-  local pv; local pvc
+  local pod; local node; local endpoints=''; local dmy
+  local endpt='gluster-endpoints'; local pv; local pvc
 
-  cat <<END_GLUSTER
+  if (( ! QUIET )) ; then
+    cat <<END_GLUSTER
 *** Gluster test suite ***
 
     The supplied gluster storage nodes (endpoints) and the glusterfs plugin
-    are tested using the busybox container. On one of the gluster
-    nodes, eg. ${GLUSTER_NODES[0]}, make sure that gluster is running, that
-    the "$GLUSTER_VOL" volume is active, and that the volume mount exists. Eg:
+    are tested using the busybox container to access the $GLUSTER_VOL volume.
+    On one of the gluster nodes, eg. ${GLUSTER_NODES[0]}, ensure that gluster
+    is running, that the "$GLUSTER_VOL" volume is active, and that the volume
+    mount exists. Eg:
        $ gluster peer status
        $ gluster volume status $GLUSTER_VOL
        $ mount | grep glusterfs
@@ -949,9 +961,12 @@ function gluster_test() {
        $ mount -a # assuming the vol mount is present in /etc/fstab
        # if the vol mount is not in /etc/fstab, then add it, eg:
        ${GLUSTER_NODES[0]}:/$GLUSTER_VOL /mnt/glusterfs/$GLUSTER_VOL glusterfs _netdev 0 0
-       # and make sure the brick is mounted as well...
+       # and make sure the brick are mounted as well...
+
 END_GLUSTER
-  sleep 2
+  
+    read -p "Press any key to continue..." -t120 dmy
+  fi
 
   echo
   echo "----------"
@@ -1013,7 +1028,7 @@ END
 
   echo
   echo "----------"
-  echo "Gluster Test 2: busybox, glusterfs plugin, SGID $SGID:"
+  echo "Gluster Test 2: busybox, glusterfs plugin, SGID $USE_SGID:"
 
   pod='gluster-pod2'
   delete_pod $pod
@@ -1033,7 +1048,7 @@ spec:
     - name: gluster-vol2
       mountPath: /usr/share/busybox
   securityContext:
-    supplementalGroups: [$sgid]
+    supplementalGroups: [$USE_SGID]
     privileged: false
   volumes:
   - name: gluster-vol2
@@ -1048,7 +1063,7 @@ END
 
   echo
   echo "----------"
-  echo "Gluster Test 3: busybox, PV, PVC, SGID $SGID:"
+  echo "Gluster Test 3: busybox, PV, PVC, SGID $USE_SGID:"
 
   # a. create PV
   pv='gluster-pv'
@@ -1113,7 +1128,7 @@ spec:
     - name: gluster-vol3
       mountPath: /usr/share/busybox
   securityContext:
-    supplementalGroups: [$sgid]
+    supplementalGroups: [$USE_SGID]
     privileged: false
   volumes:
   - name: gluster-vol3
@@ -1127,7 +1142,7 @@ END
   return 0
 }
 
-# execute the passed-in test(s).
+# execute the requested test(s).
 # $@= list of 1 or more tests (space separator)
 function execute_tests() {
 
