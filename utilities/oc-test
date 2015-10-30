@@ -256,8 +256,10 @@ function parse_cmd() {
   return 0
 }
 
-# sets the SGIDs, SUIDs, OS_SGID and OS_SUID global variables to  the values
-# founc in the project definition for the passed-in namespace.
+# sets the SGIDs, SUIDs, OS_SGID, OS_SUID and the USE_SGID global variables to
+# the values found in the project definition for the passed-in namespace. Also
+# sets the global VALID_SGID to reflect if the sgid for pods will be within the
+# openshift SGID range.
 function get_supplemental_ids() {
 
   local ns="$1"
@@ -269,6 +271,9 @@ function get_supplemental_ids() {
   ids="$(grep 'openshift.io/sa.scc.supplemental-groups:' <<<"$out")"
   SGIDs="${ids#*: }"  # keep the starting id and range
   OS_SGID=${SGIDs%/*} # first number in range
+  # use either the supplied --sgid= value or the openshift default
+  USE_SGID=${TGT_SGID:-$OS_SGID}
+  id_in_range $USE_SGID "$OS_SGID" && VALID_SGID=1 || VALID_SGID=0
 
   # SUIDs:
   ids="$(grep 'openshift.io/sa.scc.uid-range:' <<<"$out")"
@@ -276,6 +281,34 @@ function get_supplemental_ids() {
   OS_SUID=${SUIDs%/*} # first number in range
 
   return 0
+}
+
+# returns true (0) if the passed-in id is within (inclusive) the pased-in range.
+#   arg1=test id, arg2=range.
+# Ranges are of the form: <startID>/<count>  or <startID>-<endID>  and
+# a list of ranges are separated by a comma (no spaces).  Eg.
+#   range-1,range-2,...range-N
+# Note: the <startID>/<count> form is converted to a dash range by adding
+#   count-1 to <startID>. Eg. 1000/10  => 1000-1009.
+function id_in_range() {
+
+  local test_id=$1; local range=(${2//,/ }) # array
+  local id; local r; local start; local end; local cnt
+
+  for r in ${range[@]}; do
+     if [[ $r == *"/"* ]] ; then # <start>/<count> form
+       # convert to <start>-<end> form
+       start=${r%/*}; cnt=${r%*/}
+       let end=start+cnt-1
+       r="$start-$end"
+     fi
+
+     # test if test_id is within this range
+     start=${r%-*}; end=${r%*-}
+     (( start <= test_id && test_id <= end )) && return 0 # true
+  done
+
+  return 1 # false
 }
 
 # convert the passed-in list of potential hostnames to ip addresses.
@@ -328,7 +361,7 @@ function get_current_namespace() {
 }
 
 # validate openshift env on passed-in node. Return 1 on error. If no 
-# validation errors then collected ose state variables are echoed.
+# validation errors then collected ose state variables are echoed. 
 function validate_ose_env() {
 
   local out
@@ -362,10 +395,15 @@ function validate_ose_env() {
   echo "... validated"
   echo
   echo "==================================="
-  echo " Master node    : $MASTER"
-  echo " Current project: $NS"
-  echo "   Sup Group IDs: $SGIDs"
-  echo "   Sup User IDs : $SUIDs"
+  echo " Master node     : $MASTER"
+  echo " Current project : $NS"
+  echo "   Sup User IDs  : $SUIDs"
+  echo "   Sup Group IDs : $SGIDs"
+  echo " Supplied Sup GID: ${TGT_SGID:-<none>}"
+  echo " Pod's Group ID  : $USE_SGID"
+  (( VALID_SGID )) &&
+    echo "   ...is within range" ||
+    echo "   ...is NOT within range and will be rejected"
   echo "==================================="
   echo
 
@@ -662,7 +700,6 @@ function nfs_test() {
 
   local pod; local pv; local pvc; local out
   local vol_mount='/opt/nfs'; local vol_perms; local vol_gid
-  local sgid=${TGT_SGID:-$OS_SGID}
 
   echo "*** NFS test suite ***"
   echo
@@ -672,19 +709,19 @@ function nfs_test() {
   sleep 1
 
   out="$(ssh $NFS "ls -ld $vol_mount")"
-  if (( $? != 0 )) ; then
+  if (( $? == 0 )) ; then
+    out=($out) # array
+    vol_perms="${out[0]}"
+    vol_gid="${out[3]}"
+  else
     echo
     echo "WARN: cannot retrieve permissions on $vol_mount from NFS server"
     echo "      \"$NFS\" via ssh. Be aware of potential permission mismatches"
     echo "      between openshift groups and the nfs mount directory."
-    echo "      ssh output:"
+    echo
     echo "$out"
     echo
     sleep 4
-  else
-    out=($out) # array
-    vol_perms="${out[0]}"
-    vol_gid="${out[3]}"
   fi
 
   # show more info for running these tests...
@@ -700,35 +737,45 @@ function nfs_test() {
     On the NFS server, edit /etc/exports to include /opt/nfs, eg:
        /opt/nfs *(rw,sync,no_root_squash)
 
-    The openshift range of group IDs (supplemental groups) is:
-       $SGIDs
+    The SGID for created pods will be $USE_SGID, which is
 END_NFS
 
-  if [[ -n "$TGT_SGID" ]] ; then
-    cat <<END_NFS
-    which must include the supplied --sgid value of $TGT_SGID. If $TGT_SGID is
-    outside of the openshift range then the "$NS" project needs to be
-    edited to include $TGT_SGID, see below.
+  (( VALID_SGID )) &&
+    echo "    within the openshift range of $SGIDs." ||
+    echo "    NOT within the openshift range of $SGIDs."
+
+  cat <<END_NFS
+
+    The group ID for the NFS export directory $vol_mount is:
+       ${vol_gid:-<unavailable>}
+    and permissions on this directory are:
+       ${vol_perms:-<unavailable>}
 END_NFS
+
+  if [[ -n "$vol_gid" ]] ; then
+    if id_in_range $vol_gid "$OS_SGIDs" ; then
+      echo "    Pod's suppl group IDs will match NFS mount's GID so all is good!"
+    else
+      echo "    Pod's suppl group ID won't match NFS mount's GID so pod is expected"
+      echo "    to fail."
+    fi
+  else
+    echo "    NFS mount's GID cannot be retrieved so it's unknown at this time if"
+    echo "     the pod can be created or not."
   fi
 
   cat <<END_NFS
-    Perms on NFS exported $vol_mount directory are:
-       ${vol_perms:-<unavailable>}
-    and its group ID is set to:
-       ${vol_gid:-<unavailable>}
-    Ensure that the supplemental group range defined in openshift for the
-    "$NS" project includes the NFS volume mount's group id. This is done on
-    the openshift-master ($MASTER) using:
+
+    To edit the range of supplemental group IDs, on the openshift-master, use:
        $ oc edit ns $NS
-    and changing the 'openshift.io/sa.scc.supplemental-groups' range to
-    include the NFS group ID for $vol_mount.  Use
+    and change the 'openshift.io/sa.scc.supplemental-groups' range to
+    include the NFS group ID for $vol_mount.  Also, use
        $ oc get ns $NS -o yaml
     to see the values for various IDs in the "$NS" project.
 
     On the other hand, if it's ok to change the perms on $vol_mount to match
     openshift's range of groups, then execute (on $NFS):
-       $ chgrp $sgid /opt/nfs && chmod g+srw /opt/nfs
+       $ chgrp $OS_SGID /opt/nfs && chmod g+srw /opt/nfs
 
     Note: it may necessary to restart NFS:
        $ systemctl restart rpcbind nfs
