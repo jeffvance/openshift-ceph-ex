@@ -480,7 +480,7 @@ function delete_pvc() {
 function delete_pv() {
 
   local pv=$1
-  local i; local err; local out; local TRIES=3; local SLEEP=3
+  local i; local err; local out; local TRIES=15; local SLEEP=2
 
   # delete the target pv
   echo "... deleting pv \"$pv\" (if it exists)..."
@@ -632,10 +632,12 @@ function general_test() {
     cat <<END_GENERAL
 *** General test suite ***"
 
-    These baseline tests test that SGID $SGID works in emptyDir and in
-    hostPath. No PVs or claims are used.
+    These baseline tests test that SGID $SUSE_GID works in emptyDir and in
+    hostPath. No PVs or claims are used here.
+
 END_GENERAL
-    sleep 2
+
+    read -p "Press any key to continue..." -t120 out
   fi
 
   echo
@@ -667,7 +669,7 @@ END
 
   echo
   echo "----------"
-  echo "General Test 2: busybox, hostDir plugin, SGID $USE_SGID:"
+  echo "General Test 2: busybox, hostPath plugin, SGID $USE_SGID:"
 
   pod='general-pod2'
   delete_pod $pod
@@ -962,6 +964,8 @@ function gluster_test() {
        # if the vol mount is not in /etc/fstab, then add it, eg:
        ${GLUSTER_NODES[0]}:/$GLUSTER_VOL /mnt/glusterfs/$GLUSTER_VOL glusterfs _netdev 0 0
        # and make sure the brick are mounted as well...
+
+    On the ose nodes make sure to install the gluster-client.
 
 END_GLUSTER
   
