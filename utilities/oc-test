@@ -3,15 +3,31 @@
 # oc-test creates ose pods on the ose-master node (defaults to localhost) and
 # runs one or more of the specified storage tests.
 #
+# The storage specific test functions are named xxx_test(), eg. general_test()
+# or nfs_test(). The general approach, in order to not need separate yaml files
+# for each test's pod spec, is to supply the yaml as stdin to the:
+# oc create -f command.  Eg:
+#   cat <<END | oc create -f -
+#     <yaml here...>
+#   END
+#
+# The storage tests are loosley based on Scott Creeley's doc:
+#   https://mojo.redhat.com/docs/DOC-1050225
+
 # See usage() for syntax.
 #
 
 VERSION=0.1
 VERIFY_ONLY=0 # false
-ALL_TESTS='general,nfs,gluster,rbd'
-TESTS='general' # default
 MASTER="$HOSTNAME"
 OC_PREFIX=''
+# test vars
+ALL_TESTS='general,nfs,gluster,rbd'
+TESTS='general' # default
+GENERAL_TEST=1 # true, default
+GLUSTER_TEST=0 # false
+NFS_TEST=0     # false
+RBD_TEST=0     # false
 
 
 ## functions ##
@@ -40,9 +56,14 @@ DESCRIPTION
   --verify   Only test the ose enviromment but don't run any tests.
   --master <node>
              Hostname or ip of the ose-master node, default is local host
-  --oc-prefix [path]
+  --oc-prefix <path>
              An optional path prefix appended to all "oc" commands, eg.
              "/root/origin/_output/local/bin/linux/amd64" for local ose builds.
+  --sgid <number>
+             An optional supplemental group ID to be applied to the pods created
+             by various tests. If omitted the default is the first id in the
+             supplemental group ID range defined for the current project. See:
+               $ oc get ns <project> -o yaml  # for the various IDs
   --nfs-server <hostname|ip>
              NFS server's hostname or ip. Required if performing the nfs tests,
              otherwise ignored.
@@ -84,11 +105,38 @@ function parse_tests() {
   return 0
 }
 
+# set globals to true for each test passed in
+function set_test_flags() {
+
+  local tests="$@"
+  local test
+
+  for test in $tests; do
+     case "$test" in
+        general)
+          GENERAL_TEST=1 # true
+        ;;
+        gluster)
+          GLUSTER_TEST=1 # true
+        ;;
+        nfs)
+          NFS_TEST=1 # true
+        ;;
+        rbd)
+          RBD_TEST=1 # true
+        ;;
+     esac
+
+  done
+
+  return 0
+}
+
 # returns 1 on errors, else 0.
 function parse_cmd() {
 
   local errcnt=0
-  local long_opts='version,master:,verify,oc-prefix:,nfs-server:,gluster-nodes:,gluster-vol:'
+  local long_opts='version,master:,verify,oc-prefix:,nfs-server:,gluster-nodes:,gluster-vol:,sgid:'
 
   (( $# == 0 )) && usage && exit -1
 
@@ -108,6 +156,11 @@ function parse_cmd() {
 
         --master)
           MASTER="$2"
+          shift 2; continue
+        ;;
+
+        --sgid)
+          TGT_SGID="$2"
           shift 2; continue
         ;;
 
@@ -143,7 +196,8 @@ function parse_cmd() {
     return 1
   fi
 
-  if (( $# == 1 )) ; then # test arg is optional
+  if (( $# == 1 )) ; then # test arg is optional; default is general tests
+    GENERAL_TEST=0 # false, don't assume general is in the list of tests
     TESTS="$1"; shift
     # handle "all" tests
     if [[ "$TESTS" == 'all' ]] ; then
@@ -159,6 +213,7 @@ function parse_cmd() {
   fi
   TESTS=($TESTS)  # array
   NUM_TESTS=${#TESTS[@]}
+  set_test_flags ${TESTS[@]}
 
   # --oc-prefix:
   if [[ -n "$OC_PREFIX" ]] ; then
@@ -172,7 +227,7 @@ function parse_cmd() {
   fi
 
   # --nfs-server:
-  if [[ "${TESTS[@]}" =~ nfs ]] ; then # nfs test requested
+  if (( NFS_TEST )) ; then
     if [[ -z "$NFS" ]] ; then
       echo "ERROR: missing nfs server argument"
       echo
@@ -181,7 +236,7 @@ function parse_cmd() {
   fi
 
   # --gluster-nodes:
-  if [[ "${TESTS[@]}" =~ gluster ]] ; then # gluster test requested
+  if (( GLUSTER_TEST )) ; then
     if [[ -z "$GLUSTER_NODES" ]] ; then
       echo "ERROR: missing list of gluster nodes"
       echo
@@ -201,17 +256,24 @@ function parse_cmd() {
   return 0
 }
 
-# outputs the starting SGID for the "default" namespace
-function get_supplemental_group_id() {
+# sets the SGIDs, SUIDs, OS_SGID and OS_SUID global variables to  the values
+# founc in the project definition for the passed-in namespace.
+function get_supplemental_ids() {
 
-  local out
+  local ns="$1"
+  local out; local ids
 
-  out="$(ssh $MASTER "${OC_PREFIX}oc get ns -o yaml |
-           grep \"name: default\" -B6               |
-           grep \"openshift.io/sa.scc.supplemental-groups:\"")"
+  out="$(ssh $MASTER "${OC_PREFIX}oc get ns $ns -o yaml")"
 
-  out="${out#*:}"   # keep the starting id and increment
-  echo "${out%/*}" # the starting id
+  # SGIDs:
+  ids="$(grep 'openshift.io/sa.scc.supplemental-groups:' <<<"$out")"
+  SGIDs="${ids#*: }"  # keep the starting id and range
+  OS_SGID=${SGIDs%/*} # first number in range
+
+  # SUIDs:
+  ids="$(grep 'openshift.io/sa.scc.uid-range:' <<<"$out")"
+  SUIDs="${ids#*: }"  # keep the starting id and range
+  OS_SUID=${SUIDs%/*} # first number in range
 
   return 0
 }
@@ -252,16 +314,29 @@ function convert_host_to_ip() {
   return 0
 }
 
-# validate openshift env on passed-in node. Return 1 on error.
+# echos the current namespace (=project) without any quotemarks.
+function get_current_namespace() {
+
+  local ns
+
+  ns=($(ssh $MASTER "${OC_PREFIX}oc project")) # array
+  ns=${ns[2]} # includes quotes
+  ns=${ns%\"}; ns=${ns#\"} # remove enclosing quotes
+
+  echo "$ns"
+  return 0
+}
+
+# validate openshift env on passed-in node. Return 1 on error. If no 
+# validation errors then collected ose state variables are echoed.
 function validate_ose_env() {
 
   local out
 
-  echo "*** Validating ose-master ($MASTER)..."
+  echo "*** Validating ose-master: \"$MASTER\"..."
   echo
 
-  ssh $MASTER "${OC_PREFIX}oc login -u admin -p ignored &&
-               ${OC_PREFIX}oc project"
+  ssh $MASTER "${OC_PREFIX}oc login -u admin -p ignored"
   (( $? != 0 )) && return 1
   
   # oc get nodes
@@ -284,9 +359,16 @@ function validate_ose_env() {
     return 1
   fi
 
-  echo
   echo "... validated"
   echo
+  echo "==================================="
+  echo " Master node    : $MASTER"
+  echo " Current project: $NS"
+  echo "   Sup Group IDs: $SGIDs"
+  echo "   Sup User IDs : $SUIDs"
+  echo "==================================="
+  echo
+
   return 0
 }
 
@@ -495,32 +577,25 @@ function verify_new_endpoint() {
   return 1
 }
 
-# the various "test" functions are below. The general approach, in order to not
-# need separate yaml files for each test's pod spec, is to supply the yaml as
-# stdin to the oc create -f command.  Eg:
-#   cat <<END | oc create -f -
-#     <yaml here...>
-#   END
-#
-# The tests below are based on this doc:
-#   https://mojo.redhat.com/docs/DOC-1050225
-
 # run the "general" tests.
+# Note: if the user specified a target SGID it is ignored for these tests.
 function general_test() {
 
   local pod
 
-  echo "*** General test suite ***"
-  echo
-  echo "   These tests test that SGID $SGID works in emptyDir and"
-  echo "   in hostPath. No PVs or claims are used."
+  cat <<END_GENERAL
+*** General test suite ***"
+
+    These baseline tests test that SGID $SGID works in emptyDir and in
+    hostPath. No PVs or claims are used.
+END_GENERAL
   sleep 2
 
   echo
   echo "----------"
-  echo "General Test 2: busybox, emptyDir, SGID $SGID:"
+  echo "General Test 1: busybox, emptyDir, SGID $SGID:"
 
-  pod='general-pod2'
+  pod='general-pod1'
   delete_pod $pod
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
@@ -541,13 +616,13 @@ spec:
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: general test #2"; return 1; }
+    echo "ERROR: general test #1"; return 1; }
 
   echo
   echo "----------"
-  echo "General Test 3: busybox, hostDir plugin, SGID $SGID:"
+  echo "General Test 2: busybox, hostDir plugin, SGID $SGID:"
 
-  pod='general-pod3'
+  pod='general-pod2'
   delete_pod $pod
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
@@ -575,35 +650,92 @@ spec:
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: general test #3"; return 1; }
+    echo "ERROR: general test #2"; return 1; }
 
   return 0
 }
 
 # run the "nfs" tests.
+# Note: the user-specified --sgid is used in these tests. If omitted then the
+#  default openshift sgid is used.
 function nfs_test() {
 
-  local pod; local pv; local pvc
-  local vol_mount='/opt/nfs'
+  local pod; local pv; local pvc; local out
+  local vol_mount='/opt/nfs'; local vol_perms; local vol_gid
+  local sgid=${TGT_SGID:-$OS_SGID}
 
+  echo "*** NFS test suite ***"
+  echo
+
+  # get nfs server vol mount perms
+  echo "Connecting to $NFS via ssh. You may need to enter a password."
+  sleep 1
+
+  out="$(ssh $NFS "ls -ld $vol_mount")"
+  if (( $? != 0 )) ; then
+    echo
+    echo "WARN: cannot retrieve permissions on $vol_mount from NFS server"
+    echo "      \"$NFS\" via ssh. Be aware of potential permission mismatches"
+    echo "      between openshift groups and the nfs mount directory."
+    echo "      ssh output:"
+    echo "$out"
+    echo
+    sleep 4
+  else
+    out=($out) # array
+    vol_perms="${out[0]}"
+    vol_gid="${out[3]}"
+  fi
+
+  # show more info for running these tests...
   cat <<END_NFS
-*** NFS test suite ***
 
-    The NFS plugin is pointed to the supplied NFS server to run the busybox
-    container. Remember to open port 2049 on the NFS server "$NFS". A good test
-    for this is, from the openshift node "$MASTER", execute:
+    Busybox is run with a volume mounted to the NFS server.
+    Remember to open port 2049 on the NFS server "$NFS". A good test for this
+    is, from the openshift-master, "$MASTER", execute:
        $ telnet $NFS 2049  # ctrl-c to exit
     To open port 2049, on the NFS server, execute:
-       $ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT
+       $ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPTA
+
     On the NFS server, edit /etc/exports to include /opt/nfs, eg:
        /opt/nfs *(rw,sync,no_root_squash)
-    Also, on the NFS server, ensure that Group $SGID has
-    access to /opt/nfs. If not then execute:
-       $ chgrp $SGID /opt/nfs && chmod g+srw /opt/nfs
-    It may necessary to restart NFS:
-       $ systemctl restart rpcbind nfs
+
+    The openshift range of group IDs (supplemental groups) is:
+       $SGIDs
 END_NFS
-  sleep 2
+
+  if [[ -n "$TGT_SGID" ]] ; then
+    cat <<END_NFS
+    which must include the supplied --sgid value of $TGT_SGID. If $TGT_SGID is
+    outside of the openshift range then the "$NS" project needs to be
+    edited to include $TGT_SGID, see below.
+END_NFS
+  fi
+
+  cat <<END_NFS
+    Perms on NFS exported $vol_mount directory are:
+       ${vol_perms:-<unavailable>}
+    and its group ID is set to:
+       ${vol_gid:-<unavailable>}
+    Ensure that the supplemental group range defined in openshift for the
+    "$NS" project includes the NFS volume mount's group id. This is done on
+    the openshift-master ($MASTER) using:
+       $ oc edit ns $NS
+    and changing the 'openshift.io/sa.scc.supplemental-groups' range to
+    include the NFS group ID for $vol_mount.  Use
+       $ oc get ns $NS -o yaml
+    to see the values for various IDs in the "$NS" project.
+
+    On the other hand, if it's ok to change the perms on $vol_mount to match
+    openshift's range of groups, then execute (on $NFS):
+       $ chgrp $sgid /opt/nfs && chmod g+srw /opt/nfs
+
+    Note: it may necessary to restart NFS:
+       $ systemctl restart rpcbind nfs
+
+END_NFS
+
+  read -p "Press any key to continue..." -t120 out
 
   echo
   echo "----------"
@@ -647,7 +779,7 @@ END
 
   echo
   echo "----------"
-  echo "NFS Test 2: busybox, nfs plugin, SGID $SGID:"
+  echo "NFS Test 2: busybox, nfs plugin, SGID $sgid:"
 
   pod='nfs-pod2'
   delete_pod $pod
@@ -668,7 +800,7 @@ spec:
     - name: nfs-vol2
       mountPath: /usr/share/busybox
   securityContext:
-    supplementalGroups: [$SGID]
+    supplementalGroups: [$sgid]
     privileged: false
   volumes:
   - name: nfs-vol2
@@ -683,7 +815,7 @@ END
 
   echo
   echo "----------"
-  echo "NFS Test 3: busybox, PV, PVC, SGID $SGID:"
+  echo "NFS Test 3: busybox, PV, PVC, SGID $sgid:"
 
   # a. create PV
   pv='nfs-pv'
@@ -747,7 +879,7 @@ spec:
     - name: nfs-vol3
       mountPath: /usr/share/busybox
   securityContext:
-    supplementalGroups: [$SGID]
+    supplementalGroups: [$sgid]
     privileged: false
   volumes:
   - name: nfs-vol3
@@ -866,7 +998,7 @@ spec:
     - name: gluster-vol2
       mountPath: /usr/share/busybox
   securityContext:
-    supplementalGroups: [$SGID]
+    supplementalGroups: [$sgid]
     privileged: false
   volumes:
   - name: gluster-vol2
@@ -946,7 +1078,7 @@ spec:
     - name: gluster-vol3
       mountPath: /usr/share/busybox
   securityContext:
-    supplementalGroups: [$SGID]
+    supplementalGroups: [$sgid]
     privileged: false
   volumes:
   - name: gluster-vol3
@@ -968,31 +1100,20 @@ function execute_tests() {
   local test; local errcnt=0
 
   echo "*** Executing tests ..."
+  echo
 
-  for test in $tests; do
-     echo
-     case "$test" in
-        general)
-          general_test || ((errcnt++))
-        ;;
+  # execute each requested test:
+  (( GENERAL_TEST )) && {
+    general_test || ((errcnt++)); }
 
-        nfs)
-          nfs_test || ((errcnt++))
-        ;;
+  (( GLUSTER_TEST )) && {
+    gluster_test || ((errcnt++)); }
 
-        gluster)
-          gluster_test || ((errcnt++))
-        ;;
+  (( NFS_TEST )) && {
+    nfs_test || ((errcnt++)); }
 
-        rbd)
-          rbd_test || ((errcnt++))
-        ;;
-
-        *)
-          echo "ERROR: unknown test \"$test\"" && ((errcnt++))
-        ;;
-     esac
-  done
+  (( RBD_TEST )) && {
+    rbd_test || ((errcnt++)); }
 
   echo
   echo "... done with tests: $errcnt errors"
@@ -1006,6 +1127,9 @@ function execute_tests() {
 ## main ##
 
 parse_cmd $@ || exit -1
+
+NS="$(get_current_namespace)"
+get_supplemental_ids $NS # sets supplemental group and user IDs as globals
 
 echo
 if (( VERIFY_ONLY )) ; then
@@ -1022,9 +1146,6 @@ sleep 2
 
 validate_ose_env || exit 1
 
-if (( ! VERIFY_ONLY )) ; then
-  SGID=$(get_supplemental_group_id)
-  execute_tests ${TESTS[@]} || exit 1
-fi
+(( VERIFY_ONLY )) || execute_tests ${TESTS[@]} || exit 1
 
 exit 0
