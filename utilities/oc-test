@@ -563,7 +563,7 @@ function verify_new_pod() {
 function verify_new_pv() {
 
   local pv="$1"
-  local i; local TRIES=15; local SLEEP=2; local out
+  local i; local TRIES=20; local SLEEP=3; local out
 
   echo "... checking PV \"$pv\" ..."
 
@@ -981,10 +981,10 @@ END_GLUSTER
 
   for node in ${GLUSTER_NODES[@]}; do # need newlines
      endpoints+="- addresses:"$'\n'
-     endpoints+="  - IP: $node"$'\n'
-     endpoints+="    ports:"$'\n'
-     endpoints+="    - port: 1"$'\n' # ignored
-     endpoints+="      protocol: TCP"$'\n'
+     endpoints+="  - ip: $node"$'\n'
+     endpoints+="  ports:"$'\n'
+     endpoints+="  - port: 1"$'\n' # ignored
+     endpoints+="    protocol: TCP"$'\n'
   done
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
