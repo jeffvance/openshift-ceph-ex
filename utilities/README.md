@@ -1,6 +1,6 @@
 ## Openshift Storage Test Script
 
-The [oc-test](oc-test) script can be used to verify/validate an OSE environment (specifying --verify), or both verify the OSE setup and run one or more test suites. All pods created use the busybox container image and the container's mount is always */usr/share/busybox*.
+The [oc-test](oc-test) script can be used to verify/validate an OSE environment (specifying --verify), or both verify the OSE setup and run one or more storage plugin related test suites. All pods created use the busybox container image and the container's mount is always */usr/share/busybox*.
 
 Here's is the full syntax, which is displayed when all script arguments are omitted:
 
@@ -156,7 +156,8 @@ pod "general-pod2" created
   ```
   Use ``` -q ``` to suppress the "continue" prompt and reduce instructional output.
   
- 4. To run the NFS test suite:
+  
+ 4. To run the **NFS** test suite:
   ```
   ./oc-test --master rhel7-ose-1 --nfs f21-nfs  nfs
 
@@ -248,3 +249,91 @@ pod "nfs-pod3" created
 ***
   ```
   Again ``` -q ``` suppresses the continue prompt and the bulk of the nfs instructional output.
+  
+  
+ 5. To run the **Gluster** storage test suite:
+  ```
+  ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm gluster
+
+*** Will run 1 test on ose-master "rhel7-ose-1":
+       gluster
+
+*** Validating ose-master: "rhel7-ose-1"...
+
+Login successful.
+
+Using project "default".
+
+You have access to the following projects and can switch between them with 'oc project <projectname>':
+
+  * default (current)
+  * openshift
+  * openshift-infra
+
+... validated
+
+===================================
+ Master node     : rhel7-ose-1
+ Current project : default
+   Sup User IDs  : 12345/10
+   Sup Group IDs : 5555-5555,1000000000/10000
+ Supplied Sup GID: <none>
+ Pod's Group ID  : 5555
+===================================
+
+*** Executing tests ...
+
+*** Gluster test suite ***
+
+    The supplied gluster storage nodes (endpoints) and the glusterfs plugin
+    are tested using the busybox container to access the HadoopVol volume.
+    On one of the gluster nodes, eg. 192.168.122.21, ensure that gluster
+    is running, that the "HadoopVol" volume is active, and that the volume
+    mount exists. Eg:
+       $ gluster peer status
+       $ gluster volume status HadoopVol
+       $ mount | grep glusterfs
+       # if HadoopVol is not displayed, then:
+       $ mount -a # assuming the vol mount is present in /etc/fstab
+       # if the vol mount is not in /etc/fstab, then add it, eg:
+       192.168.122.21:/HadoopVol /mnt/glusterfs/HadoopVol glusterfs _netdev 0 0
+       # and make sure the bricks are mounted as well...
+
+    On the ose nodes make sure to install the gluster-client.
+
+Press any key to continue...
+
+----------
+Gluster Test 1: baseline: busybox, glusterfs plugin:
+... deleting endpoint "gluster-endpoints" (if it exists)...
+endpoints "gluster-endpoints" created
+... checking endpoint "gluster-endpoints" ...
+... deleting pod "gluster-pod1" (if it exists)...
+pod "gluster-pod1" created
+... checking pod "gluster-pod1" ...
+... checking mount type "glusterfs" for pod "gluster-pod1" ...
+
+----------
+Gluster Test 2: busybox, glusterfs plugin, SGID 5555:
+... deleting pod "gluster-pod2" (if it exists)...
+pod "gluster-pod2" created
+... checking pod "gluster-pod2" ...
+... checking mount type "glusterfs" for pod "gluster-pod2" ...
+
+----------
+Gluster Test 3: busybox, PV, PVC, SGID 5555:
+... deleting pv "gluster-pv" (if it exists)...
+persistentvolume "gluster-pv" created
+... checking PV "gluster-pv" ...
+... deleting pvc "gluster-pvc" (if it exists)...
+persistentvolumeclaim "gluster-pvc" created
+... checking PVC "gluster-pvc" ...
+... deleting pod "gluster-pod3" (if it exists)...
+pod "gluster-pod3" created
+... checking pod "gluster-pod3" ...
+... checking mount type "glusterfs" for pod "gluster-pod3" ...
+
+***
+*** Done with tests: 0 errors
+***
+  ```
