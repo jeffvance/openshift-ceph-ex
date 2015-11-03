@@ -296,8 +296,18 @@ function parse_cmd() {
 
   # --rbd-monitor:
   if (( RBD_TEST )) ; then
+    if [[ -z "$MONITOR" ]] ; then
+      echo "ERROR: missing RBD monitor node"
+      echo
+      usage && return 1
+    fi
     # convert hostname to IP, if possible
     MONITOR="$(convert_host_to_ip $MONITOR)"
+    if [[ -z "$RBD_IMAGE" ]] ; then
+      echo "ERROR: missing the RBD image name"
+      echo
+      usage && return 1
+    fi
   fi
 
   return 0
@@ -609,8 +619,8 @@ function delete_secret() {
 function verify_new_pod() {
 
   local pod="$1"
-  local i; local MAX=15 # num tries
-  local SLEEP=3; local out
+  local i; local MAX=30 # num tries
+  local SLEEP=2; local out
 
   echo "... checking pod \"$pod\" ..."
 
@@ -1242,7 +1252,7 @@ function rbd_test() {
   local secret_name='ceph-secret'
 
   pool="${RBD_IMAGE%/*}" # pool name is optional
-  [[ "$pool" == "$RBD_IMAGE" ]] && pool='rbd' # not specifie, use default
+  [[ "$pool" == "$RBD_IMAGE" ]] && pool='rbd' # not specified, use default
   RBD_IMAGE="${RBD_IMAGE#*/}" # remove pool name if present
 
   if (( ! QUIET )) ; then
@@ -1278,7 +1288,6 @@ END_RBD
   if [[ -z "$CEPH_SECRET64" ]] ; then
 CEPH_SECRET64="AQA8QvJVayBPERAAh/Kg0OYZAHOBz7jFpzLqtg==" ##TEMP!!!!
     CEPH_SECRET64="$(echo -n "$CEPH_SECRET64" | base64)"
-echo "***CEPH_SECRET64=$CEPH_SECRET64"
   fi
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
@@ -1297,7 +1306,6 @@ END
   pod='rbd-pod1'
   delete_pod $pod
 
-echo "***secret_name=$secret_name, pool=$pool, RBD_IMAGE=$RBD_IMAGE, MONITOR=$MONITOR"
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: Pod
