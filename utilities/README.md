@@ -337,3 +337,87 @@ pod "gluster-pod3" created
 *** Done with tests: 0 errors
 ***
   ```
+ 6. To run the **Ceph-RBD** test suite:
+  ```
+   ./oc-test --master rhel7-ose-1 --rbd-monitors 192.168.122.133 --rbd-image ceph-image rbd
+*** Will run 1 test on ose-master "rhel7-ose-1":
+       rbd
+
+*** Validating ose-master: "rhel7-ose-1"...
+
+Login successful.
+
+Using project "default".
+
+You have access to the following projects and can switch between them with 'oc project <projectname>':
+
+  * default (current)
+  * openshift
+  * openshift-infra
+  
+... validated
+===================================
+ Master node     : rhel7-ose-1
+ Current project : default
+   Sup User IDs  : 12345/10
+   Sup Group IDs : 5555-5555,1000000000/10000
+ Supplied Sup GID: <none>
+ Pod's Group ID  : 5555
+===================================
+
+*** Executing tests ...
+
+*** RBD test suite ***
+
+Calculating base64 ceph secret value...
+Connecting to 192.168.122.133 via ssh. You may need to enter a password.
+
+root@192.168.122.133's password: <entered password for ceph mon node>
+Computed ceph secret: QVFBOFF2SlZheUJQRVJBQWgvS2cwT1laQUhPQno3akZwekxxdGc9PQ==
+
+    Busybox is run with a volume mounted via the RBD plugin. The ceph user is
+    currently hard-coded to "admin" and the file system is assumed to be ext4.
+    (Both of these assumptions can easily be removed and added as script args.) 
+
+    Ceph needs to be installed and running correctly. Here are a few tips to 
+    perform on one of the monitors (eg. 192.168.122.133):
+      rbd create ceph-image -s 1024  # create the image
+      rbd map ceph-image             # map the image to the default pool, 'rbd'
+      rbd showmapped
+      ls /dev/rbd*                   # see which /dev/rbd device is used
+      mkfs.ext4 /dev/rbd0            # create the file system
+      # provide the below output as the --ceph-secret64 value
+      ceph auth get-key client.admin | base64
+
+      # on rhel7-ose-1:
+      yum install -y ceph-common
+
+Press any key to continue...
+
+----------
+RBD Test 1: baseline: busybox, ceph-rbd plugin:
+... deleting secret "ceph-secret" (if it exists)...
+secret "ceph-secret" created
+... checking secret "ceph-secret" ...
+... deleting pod "rbd-pod1" (if it exists)...
+pod "rbd-pod1" created
+... checking pod "rbd-pod1" ...
+... checking mount type "rbd" for pod "rbd-pod1" ...
+
+----------
+RBD Test 2: busybox, ceph-rbd plugin, PV, PVC, SGID=5555:
+... deleting pv "rbd-pv" (if it exists)...
+persistentvolume "rbd-pv" created
+... checking PV "rbd-pv" ...
+... deleting pvc "rbd-pvc" (if it exists)...
+persistentvolumeclaim "rbd-pvc" created
+... checking PVC "rbd-pvc" ...
+... deleting pod "rbd-pod2" (if it exists)...
+pod "rbd-pod2" created
+... checking pod "rbd-pod2" ...
+... checking mount type "rbd" for pod "rbd-pod2" ...
+
+***
+*** Done with tests: 0 errors
+***
+  ```
