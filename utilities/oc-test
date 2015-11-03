@@ -629,6 +629,29 @@ function delete_secret() {
   return 1
 }
 
+# returns 0 if the passed-in pod's container is missing the passed-in mount
+# type (eg. rbd, glusterfs).
+#   $1=mount type, $2= pod-name
+# Note: this function should only be called after the target pod as been
+#   verified to be Running.
+function verify_mount() {
+
+  local mnt="$1"; local pod="$2"
+  local out
+
+  echo "... checking mount type \"$mnt\" for pod \"$pod\" ..."
+
+  # first check mount inside container
+  out="$(ssh $MASTER "${OC_PREFIX}oc exec $pod mount | grep $mnt 2>&1")"
+  if (( $? == 0 )) && [[ -n "$out" ]] &&
+     grep -q '/usr/share/busybox' <<<"$out" ; then
+    return 0 # success
+  fi
+
+  echo -e "ERROR: $mnt mount missing in pod $pod:\n$out"
+  return 1
+}
+
 # returns 0 if the passed-in pod is running. Echos "oc get pod" output for all
 # errors.
 # $1= pod-name
@@ -658,7 +681,7 @@ function verify_new_pod() {
 function verify_new_pv() {
 
   local pv="$1"
-  local i; local TRIES=20; local SLEEP=3; local out
+  local i; local TRIES=30; local SLEEP=3; local out
 
   echo "... checking PV \"$pv\" ..."
 
@@ -828,6 +851,7 @@ function nfs_test() {
   local vol_mount='/opt/nfs'; local vol_perms; local vol_gid
   local sup_gids=$USE_SGID # may have the nfs vol's gid appended
 
+  echo
   echo "*** NFS test suite ***"
   echo
 
@@ -933,12 +957,15 @@ spec:
 END
 
   if ! verify_new_pod $pod ; then
-    echo "ERROR: nfs test #1"
-    echo "       Try restarting rpcbind and nfs on the nfs server \"$NFS\"."
-    echo "       Also make sure that port 2049 on the NFS server is open, eg:"
-    echo "         iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT"
+    echo "ERROR nfs test 1: pod $pod not Running"
+    echo "  Try restarting rpcbind and nfs on the nfs server \"$NFS\"."
+    echo "  Also make sure that port 2049 on the NFS server is open, eg:"
+    echo "    iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT"
     return 1
   fi
+
+  verify_mount nfs $pod || {
+    echo "ERROR nfs test 1: expected glusterfs mount missing"; return 1; }
 
   echo
   echo "----------"
@@ -974,7 +1001,10 @@ spec:
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: nfs test #2"; return 1; }
+    echo "ERROR nfs test 2: pod $pod not Running"; return 1; }
+
+  verify_mount nfs $pod || {
+    echo "ERROR nfs test 2: expected glusterfs mount missing"; return 1; }
 
   echo
   echo "----------"
@@ -1051,7 +1081,10 @@ spec:
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: nfs test #3"; return 1; }
+    echo "ERROR nfs test 3: pod $pod not Running"; return 1; }
+
+  verify_mount nfs $pod || {
+    echo "ERROR nfs test 3: expected glusterfs mount missing"; return 1; }
 
   return 0
 }
@@ -1064,6 +1097,7 @@ function gluster_test() {
 
   if (( ! QUIET )) ; then
     cat <<END_GLUSTER
+
 *** Gluster test suite ***
 
     The supplied gluster storage nodes (endpoints) and the glusterfs plugin
@@ -1078,7 +1112,7 @@ function gluster_test() {
        $ mount -a # assuming the vol mount is present in /etc/fstab
        # if the vol mount is not in /etc/fstab, then add it, eg:
        ${GLUSTER_NODES[0]}:/$GLUSTER_VOL /mnt/glusterfs/$GLUSTER_VOL glusterfs _netdev 0 0
-       # and make sure the brick are mounted as well...
+       # and make sure the bricks are mounted as well...
 
     On the ose nodes make sure to install the gluster-client.
 
@@ -1143,7 +1177,10 @@ spec:
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: gluster test #1"; return 1; }
+    echo "ERROR gluster test 1: pod $pod not Running"; return 1; }
+
+  verify_mount glusterfs $pod || {
+    echo "ERROR gluster test 1: expected glusterfs mount missing"; return 1; }
 
   echo
   echo "----------"
@@ -1178,7 +1215,10 @@ spec:
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: gluster test #1"; return 1; }
+    echo "ERROR gluster test 2: pod $pod not Running"; return 1; }
+
+  verify_mount glusterfs $pod || {
+    echo "ERROR gluster test 2: expected glusterfs mount missing"; return 1; }
 
   echo
   echo "----------"
@@ -1205,7 +1245,7 @@ spec:
 END
 
   verify_new_pv $pv || {
-    echo "ERROR: gluster test #2: can't create PV"; return 1; }
+    echo "ERROR: gluster test #3: can't create PV"; return 1; }
 
   # b. create PVC
   pvc='gluster-pvc'
@@ -1225,7 +1265,7 @@ spec:
 END
 
   verify_new_pvc $pvc || {
-    echo "ERROR: gluster test #2: can't create PVC"; return 1; }
+    echo "ERROR: gluster test #3: can't create PVC"; return 1; }
 
   # c. create pod using claim
   pod='gluster-pod3'
@@ -1256,7 +1296,10 @@ spec:
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: gluster test #3"; return 1; }
+    echo "ERROR gluster test 3: pod $pod not Running"; return 1; }
+
+  verify_mount glusterfs $pod || {
+    echo "ERROR gluster test 3: expected glusterfs mount missing"; return 1; }
 
   return 0
 }
@@ -1272,21 +1315,48 @@ function rbd_test() {
   [[ "$pool" == "$RBD_IMAGE" ]] && pool='rbd' # not specified, use default
   image="${RBD_IMAGE#*/}" # remove pool name if present
 
+  echo
+  echo "*** RBD test suite ***"
+  echo
+
+  # get ceph monitor base64 secret value if not supplied
+  if [[ -z "$CEPH_SECRET64" ]] ; then
+    mon="${MONITORS[0]}"; mon="${mon%:*}" # remove port if present
+    echo "Calculating base64 ceph secret value..."
+    echo "Connecting to $mon via ssh. You may need to enter a password."
+    sleep 1
+    echo
+
+    out="$(ssh $mon "ceph auth get-key client.admin | base64")"
+    if (( $? != 0 )) || [[ -z "$out" ]] ; then
+      echo "ERROR: cannot calculate base64 secret on $mon"
+      echo "       Execute: ceph auth get-key client.admin | base64"
+      echo "       and re-run this script providing --ceph-secret64"
+      return 1
+    fi
+    CEPH_SECRET64="$out"
+    echo "Computed ceph secret: $CEPH_SECRET64"
+    echo
+  fi
+
   if (( ! QUIET )) ; then
     cat <<END_RBD
-*** Ceph-RBD test suite ***
+    Busybox is run with a volume mounted via the RBD plugin. The ceph user is
+    currently hard-coded to "admin" and the file system is assumed to be ext4.
+    (Both of these assumptions can easily be removed and added as script args.) 
 
-    The...
+    Ceph needs to be installed and running correctly. Here are a few tips to 
+    perform on one of the monitors (eg. ${MONITORS[0]}):
+      rbd create ceph-image -s 1024  # create the image
+      rbd map ceph-image             # map the image to the default pool, 'rbd'
+      rbd showmapped
+      ls /dev/rbd*                   # see which /dev/rbd device is used
+      mkfs.ext4 /dev/rbd0            # create the file system
+      # provide the below output as the --ceph-secret64 value
+      ceph auth get-key client.admin | base64
 
-- ceph user is hard-coded to be admin
-- filesytem is hard-coded to be ext4
-- rbd create ceph-image -s 1024
-- rbd map ceph-image
-- rbd showmapped
-- ls /dev/rbd*
-- mkfs.ext4 /dev/rbd0
-- ceph auth get-key client.admin
-- echo -n "AQA8QvJVayBPERAAh/Kg0OYZAHOBz7jFpzLqtg==" | base64
+      # on $MASTER:
+      yum install -y ceph-common
 
 END_RBD
   
@@ -1299,14 +1369,6 @@ END_RBD
 
   # a. create ceph-secret
   delete_secret $secret_name
-
-  ## TODO:
-  # if the ceph-secret was not provided and we have ssh to the 1st monitor
-  # then calculate the ceph-secret here
-  if [[ -z "$CEPH_SECRET64" ]] ; then
-CEPH_SECRET64="AQA8QvJVayBPERAAh/Kg0OYZAHOBz7jFpzLqtg==" ##TEMP!!!!
-    CEPH_SECRET64="$(echo -n "$CEPH_SECRET64" | base64)"
-  fi
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
@@ -1322,7 +1384,7 @@ END
 
   # b. create monitors yaml
   for mon in ${MONITORS[@]}; do # need newlines
-     monitors+="       - $mon"$'\n'
+     monitors+="       - $mon"$'\n' # mon may include :port
   done
 
   # c. create pod with rbd plugin defined inline
@@ -1362,7 +1424,10 @@ $monitors
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: RBD test #1"; return 1; }
+    echo "ERROR rbd test 1: pod $pod not Running"; return 1; }
+
+  verify_mount rbd $pod || {
+    echo "ERROR rbd test 1: expected rbd mount missing"; return 1; }
 
   return 0
 }
@@ -1391,7 +1456,9 @@ function execute_tests() {
     rbd_test || ((errcnt++)); }
 
   echo
-  echo "... done with tests: $errcnt errors"
+  echo "***"
+  echo "*** Done with tests: $errcnt errors"
+  echo "***"
   echo
 
   (( errcnt > 0 )) && return 1
