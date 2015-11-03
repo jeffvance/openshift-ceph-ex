@@ -93,7 +93,6 @@ You have access to the following projects and can switch between them with 'oc p
   * openshift-infra
 
 ... validated
-
 ===================================
  Master node     : rhel7-ose-1
  Current project : default
@@ -157,7 +156,7 @@ pod "general-pod2" created
   Use ``` -q ``` to suppress the "continue" prompt and reduce instructional output.
   
   
- 4. To run the **NFS** test suite:
+ 4. To run the **NFS** test suite where the NFS server is "f21-nfs":
   ```
   ./oc-test --master rhel7-ose-1 --nfs f21-nfs  nfs
 
@@ -171,12 +170,10 @@ Login successful.
 Using project "default".
 
 You have access to the following projects and can switch between them with 'oc project <projectname>':
-
   * default (current)
   * openshift
   * openshift-infra
 ... validated
-==
 
 *** Executing tests ...
 
@@ -248,7 +245,7 @@ pod "nfs-pod3" created
 *** Done with tests: 0 errors
 ***
   ```
-  Again ``` -q ``` suppresses the continue prompt and the bulk of the nfs instructional output.
+  Again ``` -q ``` suppresses the continue prompt and the bulk of the nfs instructional output. Also ``` --sgid ``` can be supplied to set the Group ID in busybox container, which is useful for various access/permissions issues.
   
   
  5. To run the **Gluster** storage test suite:
