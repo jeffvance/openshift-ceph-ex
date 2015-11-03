@@ -1256,7 +1256,7 @@ function rbd_test() {
 
   pool="${RBD_IMAGE%/*}" # pool name is optional
   [[ "$pool" == "$RBD_IMAGE" ]] && pool='rbd' # not specified, use default
-  RBD_IMAGE="${RBD_IMAGE#*/}" # remove pool name if present
+  image="${RBD_IMAGE#*/}" # remove pool name if present
 
   if (( ! QUIET )) ; then
     cat <<END_RBD
@@ -1308,7 +1308,7 @@ END
 
   # b. create monitors yaml
   for mon in ${MONITORS[@]}; do # need newlines
-     monitors+="      - $mon"$'\n'
+     monitors+="       - $mon"$'\n'
   done
 
   # c. create pod with rbd plugin defined inline
@@ -1337,9 +1337,9 @@ spec:
   - name: rbd-vol1
     rbd: 
       monitors: 
-      $monitors
+$monitors
       pool: $pool
-      image: $RBD_IMAGE
+      image: $image
       user: admin
       secretRef: 
         name: $secret_name
