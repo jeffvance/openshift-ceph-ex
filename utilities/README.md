@@ -1,4 +1,4 @@
-## Openshift Test Script
+## Openshift Storage Test Script
 
 The [oc-test](oc-test) script can be used to verify/validate an OSE environment (specifying --verify), or both verify the OSE setup and run one or more test suites. All pods created use the busybox container image and the container's mount is always */usr/share/busybox*.
 
@@ -109,7 +109,7 @@ You have access to the following projects and can switch between them with 'oc p
 ./oc-test --verify --master rhel7-ose-1 --oc-prefix /root/origin/_output/local/bin/linux/amd64
   ```
 
- 3. To run the most basic test suite ("general" tests), which are the default if no tests are requested, using the same master host:
+ 3. To run the most basic test suite ("general" tests), which is the default if no tests are requested, using the same master host:
   ```
   ./oc-test --master rhel7-ose-1
 
@@ -156,7 +156,7 @@ pod "general-pod2" created
   ```
   Use ``` -q ``` to suppress the "continue" prompt and reduce instructional output.
   
-  4. To run the NFS test suite:
+ 4. To run the NFS test suite:
   ```
   ./oc-test --master rhel7-ose-1 --nfs f21-nfs  nfs
 
