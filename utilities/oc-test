@@ -17,7 +17,7 @@
 # See usage() for syntax.
 #
 
-VERSION=0.1
+VERSION=0.9
 VERIFY_ONLY=0 # false
 MASTER="$HOSTNAME"
 OC_PREFIX=''
@@ -344,17 +344,25 @@ function id_in_range() {
 
 # sets the SGIDs, SUIDs, OS_SGID, OS_SUID and the USE_SGID global variables to
 # the values found in the project definition for the passed-in namespace. 
+# Note: ID ranges have 2 formats: <start/cnt> or <start>-<end>
 function get_supplemental_ids() {
 
   local ns="$1"
-  local out; local ids
+  local out; local ids; local id
 
   out="$(ssh $MASTER "${OC_PREFIX}oc get ns $ns -o yaml")"
 
   # SGIDs:
   ids="$(grep 'openshift.io/sa.scc.supplemental-groups:' <<<"$out")"
-  SGIDs="${ids#*: }"  # keep the starting id and range
-  OS_SGID=${SGIDs%/*} # first number in range
+  SGIDs="${ids#*: }"  # remove the property name
+  id="${SGIDs%%,*}"   # first number
+
+  if [[ $id == *"/"* ]] ; then # <start>/<count> form
+    OS_SGID=${SGIDs%/*} # first number in range
+  else # <start>-<end> form
+    OS_SGID=${SGIDs%-*} # first number in range
+  fi
+
   # use either the supplied --sgid= value or the openshift default
   USE_SGID=${TGT_SGID:-$OS_SGID}
 
@@ -450,7 +458,6 @@ function validate_ose_env() {
   (( $? != 0 )) && return 1
   
   # oc get nodes
-  echo
   out="$(ssh $MASTER "${OC_PREFIX}oc get nodes")"
   if grep -q NotReady <<<"$out" ; then
     echo -e "ERROR: 1 or more nodes are not ready:\n$out"
@@ -458,7 +465,6 @@ function validate_ose_env() {
   fi
 
   # oc get scc
-  echo
   out="$(ssh $MASTER "${OC_PREFIX}oc get scc")"
   if awk '{print $4}' <<<"$out" | grep -q false ; then #HOSTDIR col has a false
     echo "ERROR: HOSTDIR is false:"
@@ -658,8 +664,8 @@ function verify_mount() {
 function verify_new_pod() {
 
   local pod="$1"
-  local i; local MAX=30 # num tries
-  local SLEEP=2; local out
+  local i; local MAX=60 # num tries
+  local SLEEP=3; local out
 
   echo "... checking pod \"$pod\" ..."
 
@@ -681,7 +687,7 @@ function verify_new_pod() {
 function verify_new_pv() {
 
   local pv="$1"
-  local i; local TRIES=30; local SLEEP=3; local out
+  local i; local TRIES=60; local SLEEP=2; local out
 
   echo "... checking PV \"$pv\" ..."
 
@@ -703,7 +709,7 @@ function verify_new_pv() {
 function verify_new_pvc() {
 
   local pvc="$1"
-  local i; local TRIES=3; local SLEEP=3; local out
+  local i; local TRIES=30; local SLEEP=2; local out
 
   echo "... checking PVC \"$pvc\" ..."
 
@@ -1012,6 +1018,11 @@ END
 
   # a. create PV
   pv='nfs-pv'
+  pvc='nfs-pvc'
+  # delete the pvc before creating the pv. That way verify_new_pv() will see
+  # the "Available" status, and not "Bound" due to the existing PVC binding to
+  # the new PV before the script sees "Available"
+  delete_pvc $pvc
   delete_pv $pv
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
@@ -1033,9 +1044,6 @@ END
     echo "ERROR: nfs test #3: can't create PV"; return 1; }
 
   # b. create PVC
-  pvc='nfs-pvc'
-  delete_pvc $pvc
-
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -1226,6 +1234,8 @@ END
 
   # a. create PV
   pv='gluster-pv'
+  pvc='gluster-pvc'
+  delete_pvc $pvc
   delete_pv $pv
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
@@ -1248,9 +1258,6 @@ END
     echo "ERROR: gluster test #3: can't create PV"; return 1; }
 
   # b. create PVC
-  pvc='gluster-pvc'
-  delete_pvc $pvc
-
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -1329,9 +1336,10 @@ function rbd_test() {
 
     out="$(ssh $mon "ceph auth get-key client.admin | base64")"
     if (( $? != 0 )) || [[ -z "$out" ]] ; then
-      echo "ERROR: cannot calculate base64 secret on $mon"
-      echo "       Execute: ceph auth get-key client.admin | base64"
-      echo "       and re-run this script providing --ceph-secret64"
+      echo -e "ERROR: cannot calculate base64 secret on $mon\n$out"
+      echo
+      echo "     Execute: ceph auth get-key client.admin | base64"
+      echo "     and re-run this script providing --ceph-secret64"
       return 1
     fi
     CEPH_SECRET64="$out"
@@ -1428,6 +1436,92 @@ END
 
   verify_mount rbd $pod || {
     echo "ERROR rbd test 1: expected rbd mount missing"; return 1; }
+
+  echo
+  echo "----------"
+  echo "RBD Test 2: busybox, ceph-rbd plugin, PV, PVC, SGID=$USE_SGID:"
+
+  # a. create pv
+  pv='rbd-pv'
+  pvc='rbd-pvc'
+  delete_pvc $pvc
+  delete_pv $pv
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: $pv
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteMany
+  rbd:
+    monitors: 
+$monitors
+    pool: $pool
+    image: $image
+    user: admin
+    secretRef: 
+      name: $secret_name
+    fsType: ext4
+    readOnly: false
+END
+
+  verify_new_pv $pv || {
+    echo "ERROR: rbd test #2: can't create PV"; return 1; }
+
+  # b. create PVC
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+     requests:
+       storage: 1Gi
+END
+
+  verify_new_pvc $pvc || {
+    echo "ERROR: rbd test #2: can't create PVC"; return 1; }
+
+  # c. create pod using claim
+  pod='rbd-pod2'
+  delete_pod $pod
+
+  cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
+apiVersion: v1
+kind: Pod
+metadata:
+  name: $pod
+  labels:
+    name: $pod
+spec:
+  containers:
+  - name: $pod
+    image: busybox
+    command: ["sleep", "60000"]
+    volumeMounts:
+    - name: rbd-vol2
+      mountPath: /usr/share/busybox
+  securityContext:
+    fsGroup: $USE_SGID
+    privileged: false
+  volumes:
+  - name: rbd-vol2
+    persistentVolumeClaim:
+      claimName: $pvc
+END
+
+  verify_new_pod $pod || {
+    echo "ERROR rbd test 2: pod $pod not Running"; return 1; }
+
+  verify_mount rbd $pod || {
+    echo "ERROR rbd test 2: expected rbd missing"; return 1; }
 
   return 0
 }
