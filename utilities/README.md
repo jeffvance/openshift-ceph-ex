@@ -3,7 +3,7 @@
 The [oc-test](oc-test) script can be used to verify/validate an OSE environment, or verify the OSE setup and run one or more storage plugin related test suites. All pods use the busybox container image and the container's mount is always */usr/share/busybox*.
 
 ### Contents
-  - [Overview](#overview)
+  - [Overview](#overview) and usage
   - [Example 1](#example-1-verify-the-target-ose-environment) - verify OSE env only
   - [Example 2](#example-2-verify-ose-env-using-non-official-origin) - verify OSE env only using custom origin
   - [Example 3](#example-3-general-tests) - General tests
