@@ -121,7 +121,7 @@ function parse_tests() {
   for test in $tests; do
      if [[ ! "$ALL_TESTS" =~ "$test" ]] ; then
        echo "ERROR: unknown test \"$test\""
-       return -1
+       return 1
      fi
   done
 
@@ -129,7 +129,7 @@ function parse_tests() {
   return 0
 }
 
-# set globals to true for each test passed in
+# set globals to true for each test passed in.
 function set_test_flags() {
 
   local tests="$@"
@@ -141,13 +141,13 @@ function set_test_flags() {
           GENERAL_TEST=1 # true
         ;;
         gluster)
-          GLUSTER_TEST=1 # true
+          GLUSTER_TEST=1
         ;;
         nfs)
-          NFS_TEST=1 # true
+          NFS_TEST=1
         ;;
         rbd|ceph)
-          RBD_TEST=1 # true
+          RBD_TEST=1
         ;;
      esac
 
@@ -256,9 +256,9 @@ function parse_cmd() {
     echo "$TESTS" # error msg
     return -1
   fi
+  set_test_flags $TESTS
   TESTS=($TESTS)  # array
   NUM_TESTS=${#TESTS[@]}
-  set_test_flags ${TESTS[@]}
 
   # --oc-prefix:
   if [[ -n "$OC_PREFIX" ]] ; then
@@ -293,8 +293,7 @@ function parse_cmd() {
       usage && return 1
     fi
     # convert hostnames to IPs, if possible
-    GLUSTER_NODES=(${GLUSTER_NODES//,/ }) # array
-    GLUSTER_NODES=($(convert_host_to_ip ${GLUSTER_NODES[@]}))
+    GLUSTER_NODES=($(convert_host_to_ip ${GLUSTER_NODES//,/ })) # array
   fi
 
   # --rbd-monitors:
@@ -310,20 +309,17 @@ function parse_cmd() {
       usage && return 1
     fi
     # convert hostnames to IPs, if possible
-    MONITORS=(${MONITORS//,/ }) # array, may include :port
-    MONITORS=($(convert_host_to_ip ${MONITORS[@]}))
+    MONITORS=($(convert_host_to_ip ${MONITORS//,/ })) # array
   fi
 
   return 0
 }
 
 # returns true (0) if the passed-in id is within (inclusive) the pased-in range.
-#   arg1=test id, arg2=range.
+#   arg1=test-id, arg2=range.
 # Ranges are of the form: <startID>/<count>  or <startID>-<endID>  and
 # a list of ranges are separated by a comma (no spaces).  Eg.
 #   range-1,range-2,...range-N
-# Note: the <startID>/<count> form is converted to a dash range by adding
-#   count-1 to <startID>. Eg. 1000/10  => 1000-1009.
 function id_in_range() {
 
   local test_id=$1; local range="${2//,/ }" # list
@@ -355,17 +351,16 @@ function get_supplemental_ids() {
   # SGIDs:
   ids="$(grep 'openshift.io/sa.scc.supplemental-groups:' <<<"$out")"
   SGIDs="${ids#*: }"  # remove the property name
-  id="${SGIDs%%,*}"   # first number
+  id="${SGIDs%%,*}"   # first range
 
   if [[ $id == *"/"* ]] ; then # <start>/<count> form
-    OS_SGID=${SGIDs%/*} # first number in range
+    OS_SGID=${id%/*} # first number in range
   else # <start>-<end> form
-    OS_SGID=${SGIDs%-*} # first number in range
+    OS_SGID=${id%-*} # first number in range
   fi
 
   # use either the supplied --sgid= value or the openshift default
   USE_SGID=${TGT_SGID:-$OS_SGID}
-
   # error out if the target sgid is not w/in the openshift range
   if ! id_in_range $USE_SGID "$SGIDs" ; then
     echo "ERROR: target SGID of $USE_SGID is not within the range of supplemental"
@@ -378,13 +373,19 @@ function get_supplemental_ids() {
 
   # SUIDs:
   ids="$(grep 'openshift.io/sa.scc.uid-range:' <<<"$out")"
-  SUIDs="${ids#*: }"  # keep the starting id and range
-  OS_SUID=${SUIDs%/*} # first number in range
+  SUIDs="${ids#*: }"  # remove the property name
+  id="${SUIDs%%,*}"   # first range
+
+  if [[ $id == *"/"* ]] ; then # <start>/<count> form
+    OS_SUID=${id%/*} # first number in range
+  else # <start>-<end> form
+    OS_SUID=${id%-*} # first number in range
+  fi
 
   return 0
 }
 
-# Convert the passed-in list of potential hostnames to ip addresses.
+# Convert the passed-in list of possible hostnames to ip addresses.
 # Output the list with space delimiters so it is easily made into an array.
 # Note: the list of hostnames may include :portNum after each IP/hostname,
 #   which is preserved.
