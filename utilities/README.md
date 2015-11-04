@@ -114,7 +114,7 @@ You have access to the following projects and can switch between them with 'oc p
 ```
 
 
-### Example 2: verify the target OSE environment using a non-official version of origin
+### Example 2: verify the OSE environment using non-official origin
 The ```--oc-prefix``` option allows the tester to build her own version of origin, specifying the path to the oc binary so that the script's *oc* commands use the correct copy of *oc*.
 
 ```
@@ -170,7 +170,7 @@ pod "general-pod2" created
   Use `-q` to suppress the "continue" prompt and reduce instructional output.
   
   
-### Example 4: run the NFS test suite
+### Example 4: NFS test suite
 In this example the NFS server is "f21-nfs".
 ```
   ./oc-test --master rhel7-ose-1 --nfs-server f21-nfs  nfs
@@ -261,10 +261,11 @@ pod "nfs-pod3" created
 ***
 ```
   Again `-q` suppresses the continue prompt and the bulk of the nfs instructional output. Also `--sgid` can be supplied to set the Group ID in the busybox container, which is useful for various access/permissions issues.
-  
-  
- 5. To run the **Gluster** storage test suite:
-  ```
+
+
+### Example 5: Gluster storage test suite
+This example runs the gluster tests against an existing gluster cluster and volume.
+```
   ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm gluster
 
 *** Will run 1 test on ose-master "rhel7-ose-1":
@@ -348,9 +349,11 @@ pod "gluster-pod3" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
- 6. To run the **Ceph-RBD** test suite:
-  ```
+```
+
+### Example 6: Ceph-RBD test suite
+This example runs the ceph-rbd tests against an existing Ceph cluster, which is defined by a single monitor and an existing rbd image. In this case the ceph secret is generated from the monitor, but the ```--ceph-secret64``` option can be specified if there is no ssh access to the monitor.
+```
    ./oc-test --master rhel7-ose-1 --rbd-monitors 192.168.122.133 --rbd-image ceph-image rbd
 *** Will run 1 test on ose-master "rhel7-ose-1":
        rbd
