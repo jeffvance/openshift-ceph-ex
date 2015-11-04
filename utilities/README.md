@@ -9,7 +9,7 @@ The [oc-test](oc-test) script can be used to verify/validate an OSE environment,
   - [Example 3](#example-3-general-tests) - General tests
   - [Example 4](#example-4-nfs-test-suite) - NFS tests
   - [Example 5](#example-5-gluster-storage-test-suite) - Gluster tests
-  - [Example 6](#example 6-ceph-rbd-test-suite) - Ceph-RBD tests
+  - [Example 6](#example-6-ceph-rbd-test-suite) - Ceph-RBD tests
 
 ### Overview
 At the end of the tests all pods, PV, PVCs, endpoints, secrets, etc. that were successfully created remain actively running. This allows the tester to inspect containers, exec into running containers and test file access, verify the container's user's ids, etc. Over time these types of manual container focused tests could be automated.
