@@ -1,8 +1,12 @@
 ## Openshift Storage Test Script
 
-The [oc-test](oc-test) script can be used to verify/validate an OSE environment (specifying --verify), or both verify the OSE setup and run one or more storage plugin related test suites. All pods created use the busybox container image and the container's mount is always */usr/share/busybox*.
+The [oc-test](oc-test) script can be used to verify/validate an OSE environment, or verify the OSE setup and run one or more storage plugin related test suites. All pods use the busybox container image and the container's mount is always */usr/share/busybox*.
 
-Here's is the full syntax, which is displayed when all script arguments are omitted:
+At the end of the tests all pods, PV, PVCs, endpoints, secrets, etc. that were successfully created remain actively running. This allows the tester to inspect containers, exec into running containers and test file access, verify the container's user's ids, etc. Over time these types of manual container focused tests could be automated.
+
+There is no attempt to run *docker rm* to delete containers and reclaim their associated storage, so this should be done by the tester.
+ 
+Here's is the full syntax, which is displayed when no arguments are supplied:
 
 ```
   oc-test - execute one or more ose storage tests
