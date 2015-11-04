@@ -555,3 +555,18 @@ pod "rbd-pod2" created
 *** Done with tests: 0 errors
 ***
   ```
+  And on the OSE-master, here are the pods created by all of the storage tests:
+  ```
+  oc get pod
+NAME           READY     STATUS    RESTARTS   AGE
+general-pod1   1/1       Running   0          3m
+general-pod2   1/1       Running   0          3m
+gluster-pod1   1/1       Running   0          3m
+gluster-pod2   1/1       Running   0          3m
+gluster-pod3   1/1       Running   0          3m
+nfs-pod1       1/1       Running   0          2m
+nfs-pod2       1/1       Running   0          2m
+nfs-pod3       1/1       Running   0          2m
+rbd-pod1       1/1       Running   0          1m
+rbd-pod2       1/1       Running   0          1m
+  ```
