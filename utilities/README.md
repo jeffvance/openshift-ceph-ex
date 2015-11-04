@@ -77,9 +77,15 @@ DESCRIPTION
   -q         Suppress all prompts and reduce instructional output.
 ```
 
-### Examples:
- 1. To simply verify the target OSE environment, where "rhel7-ose-1" is the name of the OSE master host:
-  ```
+
+## Examples:
+The examples below show how to run *oc-test* to test gluster, nfs, ceph, or running all tests in one invocation. Note that to run test A and test B, simply specify *A,B* (no space) as the test argument value.
+
+
+### Example 1: verify the target OSE environment:
+In this example "rhel7-ose-1" is the name of the OSE master host.
+
+```
   ./oc-test --verify --master rhel7-ose-1
   
   *** Only validating the environment on ose-master "rhel7-ose-1"
@@ -105,9 +111,11 @@ You have access to the following projects and can switch between them with 'oc p
  Supplied Sup GID: <none>
  Pod's Group ID  : 5555
 ===================================
-  ```
+```
 
- 2. To verify the target OSE environment and use a non-official version of origin (on the same master):
+
+## Example 2: verify the target OSE environment using a non-official version of origin:
+
   ```
 ./oc-test --verify --master rhel7-ose-1 --oc-prefix /root/origin/_output/local/bin/linux/amd64
   ```
@@ -157,7 +165,7 @@ pod "general-pod2" created
 *** Done with tests: 0 errors
 ***
   ```
-  Use ``` -q ``` to suppress the "continue" prompt and reduce instructional output.
+  Use `-q` to suppress the "continue" prompt and reduce instructional output.
   
   
  4. To run the **NFS** test suite where the NFS server is "f21-nfs":
@@ -249,7 +257,7 @@ pod "nfs-pod3" created
 *** Done with tests: 0 errors
 ***
   ```
-  Again ``` -q ``` suppresses the continue prompt and the bulk of the nfs instructional output. Also ``` --sgid ``` can be supplied to set the Group ID in the busybox container, which is useful for various access/permissions issues.
+  Again `-q` suppresses the continue prompt and the bulk of the nfs instructional output. Also `--sgid` can be supplied to set the Group ID in the busybox container, which is useful for various access/permissions issues.
   
   
  5. To run the **Gluster** storage test suite:
