@@ -158,7 +158,7 @@ pod "general-pod2" created
   
  4. To run the **NFS** test suite where the NFS server is "f21-nfs":
   ```
-  ./oc-test --master rhel7-ose-1 --nfs f21-nfs  nfs
+  ./oc-test --master rhel7-ose-1 --nfs-server f21-nfs  nfs
 
 *** Will run 1 test on ose-master "rhel7-ose-1":
        nfs
@@ -419,11 +419,11 @@ pod "rbd-pod2" created
 ***
   ```
 
-  7. To run **ALL** of the test suites in one fell swoop, somewhat quietly:
-   ```
+ 7. To run **ALL** of the test suites in one fell swoop, somewhat quietly:
+  ```
    ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm --nfs-server=f21-nfs  --rbd-monitors 192.168.122.133 --rbd-image ceph-image  all -q
-
-*** Will run 4 tests on ose-master "rhel7-ose-1":
+   
+   *** Will run 4 tests on ose-master "rhel7-ose-1":
        general
        nfs
        gluster
@@ -492,13 +492,6 @@ pod "gluster-pod3" created
 Connecting to f21-nfs via ssh. You may need to enter a password.
 
 root@f21-nfs's password: 
-Connection closed by 192.168.122.73
-WARN: cannot retrieve permissions on /opt/nfs from NFS server
-      "f21-nfs" via ssh. Be aware of potential permission mismatches
-      between openshift supplemental groups and the NFS mount
-      directory.
-
-
 
 ----------
 NFS Test 1: baseline: busybox, nfs plugin:
@@ -535,7 +528,6 @@ Connecting to 192.168.122.133 via ssh. You may need to enter a password.
 root@192.168.122.133's password: 
 Computed ceph secret: QVFBOFF2SlZheUJQRVJBQWgvS2cwT1laQUhPQno3akZwekxxdGc9PQ==
 
-
 ----------
 RBD Test 1: baseline: busybox, ceph-rbd plugin:
 ... deleting secret "ceph-secret" (if it exists)...
@@ -562,4 +554,4 @@ pod "rbd-pod2" created
 ***
 *** Done with tests: 0 errors
 ***
-   ```
+  ```
