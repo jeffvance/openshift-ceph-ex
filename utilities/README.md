@@ -2,6 +2,11 @@
 
 The [oc-test](oc-test) script can be used to verify/validate an OSE environment, or verify the OSE setup and run one or more storage plugin related test suites. All pods use the busybox container image and the container's mount is always */usr/share/busybox*.
 
+### Table of Contents
+  - [Overview](#overview)
+  - [Example 1: verify only](#example-1-verify-the-target-ose-environment)
+
+### Overview
 At the end of the tests all pods, PV, PVCs, endpoints, secrets, etc. that were successfully created remain actively running. This allows the tester to inspect containers, exec into running containers and test file access, verify the container's user's ids, etc. Over time these types of manual container focused tests could be automated.
 
 There is no attempt to run *docker rm* to delete containers and reclaim their associated storage, so this should be done by the tester.
