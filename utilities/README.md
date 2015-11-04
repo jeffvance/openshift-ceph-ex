@@ -82,7 +82,7 @@ DESCRIPTION
 The examples below show how to run *oc-test* to test gluster, nfs, ceph, or running all tests in one invocation. Note that to run test A and test B, simply specify *A,B* (no space) as the test argument value.
 
 
-### Example 1: verify the target OSE environment:
+### Example 1: verify the target OSE environment
 In this example "rhel7-ose-1" is the name of the OSE master host.
 
 ```
@@ -114,14 +114,16 @@ You have access to the following projects and can switch between them with 'oc p
 ```
 
 
-## Example 2: verify the target OSE environment using a non-official version of origin:
+### Example 2: verify the target OSE environment using a non-official version of origin
+The ```--oc-prefix``` option allows the tester to build her own version of origin, specifying the path to the oc binary so that the script's *oc* commands use the correct copy of *oc*.
 
-  ```
+```
 ./oc-test --verify --master rhel7-ose-1 --oc-prefix /root/origin/_output/local/bin/linux/amd64
-  ```
+```
 
- 3. To run the most basic test suite ("general" tests), which is the default if no tests are requested, using the same master host:
-  ```
+### Example 3: run the "general" tests
+The *general* test suite is the default test suite if no tests are requested.
+```
   ./oc-test --master rhel7-ose-1
 
 *** Will run 1 test on ose-master "rhel7-ose-1":
@@ -164,12 +166,13 @@ pod "general-pod2" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
+```
   Use `-q` to suppress the "continue" prompt and reduce instructional output.
   
   
- 4. To run the **NFS** test suite where the NFS server is "f21-nfs":
-  ```
+### Example 4: run the NFS test suite
+In this example the NFS server is "f21-nfs".
+```
   ./oc-test --master rhel7-ose-1 --nfs-server f21-nfs  nfs
 
 *** Will run 1 test on ose-master "rhel7-ose-1":
@@ -256,7 +259,7 @@ pod "nfs-pod3" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
+```
   Again `-q` suppresses the continue prompt and the bulk of the nfs instructional output. Also `--sgid` can be supplied to set the Group ID in the busybox container, which is useful for various access/permissions issues.
   
   
