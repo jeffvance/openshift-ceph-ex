@@ -10,6 +10,7 @@ The [oc-test](oc-test) script can be used to verify/validate an OSE environment,
   - [Example 4](#example-4-nfs-test-suite) - NFS tests
   - [Example 5](#example-5-gluster-storage-test-suite) - Gluster tests
   - [Example 6](#example-6-ceph-rbd-test-suite) - Ceph-RBD tests
+  - [Example 7](#example-7-all-test-suites) - all tests 
 
 ### Overview
 At the end of the tests all pods, PV, PVCs, endpoints, secrets, etc. that were successfully created remain actively running. This allows the tester to inspect containers, exec into running containers and test file access, verify the container's user's ids, etc. Over time these types of manual container focused tests could be automated.
@@ -445,10 +446,11 @@ pod "rbd-pod2" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
+```
 
- 7. To run **ALL** of the test suites in one fell swoop, somewhat quietly:
-  ```
+### Example 7: ALL test suites
+All tests in a single *oc-test* invocation and somewhat quietly.
+```
    ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm --nfs-server=f21-nfs  --rbd-monitors 192.168.122.133 --rbd-image ceph-image  all -q
    
    *** Will run 4 tests on ose-master "rhel7-ose-1":
@@ -582,9 +584,10 @@ pod "rbd-pod2" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
-  And on the OSE-master, here are the pods created by all of the storage tests:
-  ```
+```
+
+And on the OSE-master, here are the pods created by all of the storage tests:
+```
   oc get pod
 NAME           READY     STATUS    RESTARTS   AGE
 general-pod1   1/1       Running   0          3m
@@ -597,4 +600,4 @@ nfs-pod2       1/1       Running   0          2m
 nfs-pod3       1/1       Running   0          2m
 rbd-pod1       1/1       Running   0          1m
 rbd-pod2       1/1       Running   0          1m
-  ```
+```
