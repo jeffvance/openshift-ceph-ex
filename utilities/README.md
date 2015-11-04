@@ -2,9 +2,11 @@
 
 The [oc-test](oc-test) script can be used to verify/validate an OSE environment, or verify the OSE setup and run one or more storage plugin related test suites. All pods use the busybox container image and the container's mount is always */usr/share/busybox*.
 
-### Table of Contents
+### Contents
   - [Overview](#overview)
-  - [Example 1: verify only](#example-1-verify-the-target-ose-environment)
+  - [Example 1](#example-1-verify-the-target-ose-environment) - verify OSE env only
+  - [Example 2](#example-2-verify-ose-env-using-non-official-origin) - verify OSE env only using custom origin
+  - [Example 3](#example-3-general-tests) - General tests
 
 ### Overview
 At the end of the tests all pods, PV, PVCs, endpoints, secrets, etc. that were successfully created remain actively running. This allows the tester to inspect containers, exec into running containers and test file access, verify the container's user's ids, etc. Over time these types of manual container focused tests could be automated.
@@ -119,14 +121,14 @@ You have access to the following projects and can switch between them with 'oc p
 ```
 
 
-### Example 2: verify the OSE environment using non-official origin
+### Example 2: verify OSE env using non-official origin
 The ```--oc-prefix``` option allows the tester to build her own version of origin, specifying the path to the oc binary so that the script's *oc* commands use the correct copy of *oc*.
 
 ```
 ./oc-test --verify --master rhel7-ose-1 --oc-prefix /root/origin/_output/local/bin/linux/amd64
 ```
 
-### Example 3: run the "general" tests
+### Example 3: General tests
 The *general* test suite is the default test suite if no tests are requested.
 ```
   ./oc-test --master rhel7-ose-1
