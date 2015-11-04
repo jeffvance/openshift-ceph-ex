@@ -245,7 +245,7 @@ pod "nfs-pod3" created
 *** Done with tests: 0 errors
 ***
   ```
-  Again ``` -q ``` suppresses the continue prompt and the bulk of the nfs instructional output. Also ``` --sgid ``` can be supplied to set the Group ID in busybox container, which is useful for various access/permissions issues.
+  Again ``` -q ``` suppresses the continue prompt and the bulk of the nfs instructional output. Also ``` --sgid ``` can be supplied to set the Group ID in the busybox container, which is useful for various access/permissions issues.
   
   
  5. To run the **Gluster** storage test suite:
@@ -418,3 +418,148 @@ pod "rbd-pod2" created
 *** Done with tests: 0 errors
 ***
   ```
+
+  7. To run **ALL** of the test suites in one fell swoop, somewhat quietly:
+   ```
+   ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm --nfs-server=f21-nfs  --rbd-monitors 192.168.122.133 --rbd-image ceph-image  all -q
+
+*** Will run 4 tests on ose-master "rhel7-ose-1":
+       general
+       nfs
+       gluster
+       rbd
+
+*** Validating ose-master: "rhel7-ose-1"...
+
+Login successful.
+
+Using project "default".
+
+You have access to the following projects and can switch between them with 'oc project <projectname>':
+
+  * default (current)
+  * openshift
+  * openshift-infra
+
+... validated
+
+*** Executing tests ...
+
+----------
+General Test 1: busybox, emptyDir, SGID 5555:
+... deleting pod "general-pod1" (if it exists)...
+pod "general-pod1" created
+... checking pod "general-pod1" ...
+
+----------
+General Test 2: busybox, hostPath plugin, SGID 5555:
+... deleting pod "general-pod2" (if it exists)...
+pod "general-pod2" created
+... checking pod "general-pod2" ...
+
+----------
+Gluster Test 1: baseline: busybox, glusterfs plugin:
+... deleting endpoint "gluster-endpoints" (if it exists)...
+endpoints "gluster-endpoints" created
+... checking endpoint "gluster-endpoints" ...
+... deleting pod "gluster-pod1" (if it exists)...
+pod "gluster-pod1" created
+... checking pod "gluster-pod1" ...
+... checking mount type "glusterfs" for pod "gluster-pod1" ...
+
+----------
+Gluster Test 2: busybox, glusterfs plugin, SGID 5555:
+... deleting pod "gluster-pod2" (if it exists)...
+pod "gluster-pod2" created
+... checking pod "gluster-pod2" ...
+... checking mount type "glusterfs" for pod "gluster-pod2" ...
+
+----------
+Gluster Test 3: busybox, PV, PVC, SGID 5555:
+... deleting pvc "gluster-pvc" (if it exists)...
+... deleting pv "gluster-pv" (if it exists)...
+persistentvolume "gluster-pv" created
+... checking PV "gluster-pv" ...
+persistentvolumeclaim "gluster-pvc" created
+... checking PVC "gluster-pvc" ...
+... deleting pod "gluster-pod3" (if it exists)...
+pod "gluster-pod3" created
+... checking pod "gluster-pod3" ...
+... checking mount type "glusterfs" for pod "gluster-pod3" ...
+
+*** NFS test suite ***
+
+Connecting to f21-nfs via ssh. You may need to enter a password.
+
+root@f21-nfs's password: 
+Connection closed by 192.168.122.73
+WARN: cannot retrieve permissions on /opt/nfs from NFS server
+      "f21-nfs" via ssh. Be aware of potential permission mismatches
+      between openshift supplemental groups and the NFS mount
+      directory.
+
+
+
+----------
+NFS Test 1: baseline: busybox, nfs plugin:
+... deleting pod "nfs-pod1" (if it exists)...
+pod "nfs-pod1" created
+... checking pod "nfs-pod1" ...
+... checking mount type "nfs" for pod "nfs-pod1" ...
+
+----------
+NFS Test 2: busybox, nfs plugin, SGID 5555:
+... deleting pod "nfs-pod2" (if it exists)...
+pod "nfs-pod2" created
+... checking pod "nfs-pod2" ...
+... checking mount type "nfs" for pod "nfs-pod2" ...
+
+----------
+NFS Test 3: busybox, PV, PVC, SGID 5555:
+... deleting pvc "nfs-pvc" (if it exists)...
+... deleting pv "nfs-pv" (if it exists)...
+persistentvolume "nfs-pv" created
+... checking PV "nfs-pv" ...
+persistentvolumeclaim "nfs-pvc" created
+... checking PVC "nfs-pvc" ...
+... deleting pod "nfs-pod3" (if it exists)...
+pod "nfs-pod3" created
+... checking pod "nfs-pod3" ...
+... checking mount type "nfs" for pod "nfs-pod3" ...
+
+*** RBD test suite ***
+
+Calculating base64 ceph secret value...
+Connecting to 192.168.122.133 via ssh. You may need to enter a password.
+
+root@192.168.122.133's password: 
+Computed ceph secret: QVFBOFF2SlZheUJQRVJBQWgvS2cwT1laQUhPQno3akZwekxxdGc9PQ==
+
+
+----------
+RBD Test 1: baseline: busybox, ceph-rbd plugin:
+... deleting secret "ceph-secret" (if it exists)...
+secret "ceph-secret" created
+... checking secret "ceph-secret" ...
+... deleting pod "rbd-pod1" (if it exists)...
+pod "rbd-pod1" created
+... checking pod "rbd-pod1" ...
+... checking mount type "rbd" for pod "rbd-pod1" ...
+
+----------
+RBD Test 2: busybox, ceph-rbd plugin, PV, PVC, SGID=5555:
+... deleting pvc "rbd-pvc" (if it exists)...
+... deleting pv "rbd-pv" (if it exists)...
+persistentvolume "rbd-pv" created
+... checking PV "rbd-pv" ...
+persistentvolumeclaim "rbd-pvc" created
+... checking PVC "rbd-pvc" ...
+... deleting pod "rbd-pod2" (if it exists)...
+pod "rbd-pod2" created
+... checking pod "rbd-pod2" ...
+... checking mount type "rbd" for pod "rbd-pod2" ...
+
+***
+*** Done with tests: 0 errors
+***
+   ```
