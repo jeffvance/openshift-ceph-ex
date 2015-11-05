@@ -446,12 +446,12 @@ function get_current_namespace() {
   return 0
 }
 
-# validate openshift env on passed-in node. Return 1 on error. If no 
-# validation errors then collected ose state variables are echoed. Sets the
-# global array OSE_NODES.
+# validate openshift env on passed-in node. Return 1 on error. Sets the global
+# array OSE_NODES to include all ready/scheduable nodes. Outputs features of
+# the current ose environment.
 function validate_ose_env() {
 
-  local out
+  local out; local not_ready_nodes
 
   echo "*** Validating ose-master: \"$MASTER\"..."
   echo
@@ -465,9 +465,13 @@ function validate_ose_env() {
     echo -e "ERROR: 1 or more nodes are not ready:\n$out"
     return 1
   fi
+  # remove header from nodes list
+  out="$(tail -n +2 <<<"$out")"
 
   # set OSE_NODES to the list of nodes
-  OSE_NODES=($(cut -d' ' -f1 <<<"$out" | tail -n +2)) # 1st col and skip NAMES
+  not_ready_nodes=($(grep -v Ready <<<"$out" |
+                     cut -d' ' -f1)) # not scheduable
+  OSE_NODES=($(grep Ready <<<"$out" | cut -d' ' -f1)) # only scheduable nodes
 
   # oc get scc
   out="$(ssh $MASTER "${OC_PREFIX}oc get scc")"
@@ -485,6 +489,10 @@ function validate_ose_env() {
   echo "==================================="
   echo " Master node     : $MASTER"
   echo " OSE worker nodes: ${OSE_NODES[@]}"
+  if (( ${#not_ready_nodes[@]} )) ; then
+    echo "  ** these nodes are not scheduable:"
+    echo "       ${not_ready_nodes[@]}"
+  fi
   echo " Current project : $NS"
   echo "   Sup User IDs  : $SUIDs"
   echo "   Sup Group IDs : $SGIDs"
@@ -821,6 +829,32 @@ function verify_nfs_setup() {
   return 0
 }
 
+# If the passed-in gid is already a number then it is echo'd as-is and 0 is
+# returned. Otherwise, the passed-in gid is converted to its corresponding 
+# numeric value, via ssh to the passed-in target server, and the numberic
+# value is output. Returns 1 and echos a generic error msg if getent returns
+# an error. In this case the caller should set their gid var to "".
+# $1=gid value, $2=remote server
+function handle_gid_string() {
+
+  local gid="$1"; local server="$2"
+  local rtn="$gid"; local err=0
+
+  if [[ ! $gid =~ ^[0-9]+$ ]] ; then # not all numeric
+    # get the numeric id from the passed-in server
+    rtn="$(ssh $server "getent group $gid | cut -d: -f3")"
+    err=$?
+  fi
+
+  (( err == 0 )) && { echo "$rtn"; return 0; }
+
+  # getent error
+  echo "WARN: unable to convert the string GID \"$gid\" to its numeric"
+  echo "  equivalent on server $server. OSE doesn't support string GIDs"
+  echo "  in its ID range implementation."
+  return 1
+}
+
 # run the "general" tests.
 function general_test() {
 
@@ -924,23 +958,9 @@ function nfs_test() {
     out=($out) # array
     vol_perms="${out[0]}"
     vol_gid="${out[3]}"
-
-    # handle string gid
-    if [[ ! $vol_gid =~ ^[0-9]+$ ]] ; then # not all numeric
-      # get the numeric id from the NFS server
-      echo "Converting \"$vol_gid\" to its numeric value on $node..."
-      out="$(ssh $NFS "getent group $vol_gid | cut -d: -f3")"
-      if (( $? == 0 )) ; then
-        vol_gid="$out"
-      else
-        echo "WARN: unable to convert the NFS mount directory ${vol_mount}'s"
-        echo "  string GID \"$vol_gid\" to its numeric value. OSE doesn't"
-        echo "  support string GIDs in its ID range implementation. The mount's"
-        echo "  GID will be set to \"\" (nil)."
-        vol_gid=''
-      fi
-    fi
-
+    # convert string gid value (if it's a string) to numeric
+    vol_gid="$(handle_gid_string $vol_gid $NFS)"
+    (( $? != 0 )) && { echo "$vol_gid"; vol_gid=''; }
   else
     echo "WARN: cannot retrieve permissions on $vol_mount from NFS server"
     echo "  \"$NFS\" via ssh. Be aware of potential permission mismatches"
@@ -1196,22 +1216,9 @@ function gluster_test() {
     out=($out) # array
     mnt_perms="${out[0]}"
     mnt_gid="${out[3]}"
-
-    # handle string gid
-    if [[ ! $mnt_gid =~ ^[0-9]+$ ]] ; then # not all numeric
-      # get the numeric id from the gluster storage node
-      echo "Converting \"$mnt_gid\" to its numeric value on $node..."
-      out="$(ssh $node "getent group $mnt_gid | cut -d: -f3")"
-      if (( $? == 0 )) ; then
-        mnt_gid="$out"
-      else
-        echo "WARN: unable to convert the \"$GLUSTER_VOL\" volume's mount's"
-        echo "  string GID \"$mnt_gid\" to its numeric value. OSE doesn't"
-        echo "  support string GIDs in its ID range implementation. The"
-        echo "  mount's GID will be set to \"\" (nil)."
-        mnt_gid=''
-      fi
-    fi
+    # convert string gid value (if it's a string) to numeric
+    mnt_gid="$(handle_gid_string $mnt_gid $node)"
+    (( $? != 0 )) && { echo "$mnt_gid"; vol_gid=''; }
   else
     echo "WARN: cannot retrieve permissions for \"$GLUSTER_VOL\" from gluster"
     echo "  node $node via ssh. Be aware of potential permission mismatches"
