@@ -1,8 +1,23 @@
 ## Openshift Storage Test Script
 
-The [oc-test](oc-test) script can be used to verify/validate an OSE environment (specifying --verify), or both verify the OSE setup and run one or more storage plugin related test suites. All pods created use the busybox container image and the container's mount is always */usr/share/busybox*.
+The [oc-test](oc-test) script can be used to verify/validate an OSE environment, or verify the OSE setup and run one or more storage plugin related test suites. All pods use the busybox container image and the container's mount is always */usr/share/busybox*.
 
-Here's is the full syntax, which is displayed when all script arguments are omitted:
+### Contents
+  - [Overview](#overview) and usage
+  - [Example 1](#example-1-verify-the-target-ose-environment) - verify OSE env only
+  - [Example 2](#example-2-verify-ose-env-using-non-official-origin) - verify OSE env only using custom origin
+  - [Example 3](#example-3-general-tests) - General tests
+  - [Example 4](#example-4-nfs-test-suite) - NFS tests
+  - [Example 5](#example-5-gluster-storage-test-suite) - Gluster tests
+  - [Example 6](#example-6-ceph-rbd-test-suite) - Ceph-RBD tests
+  - [Example 7](#example-7-all-test-suites) - all tests 
+
+### Overview
+At the end of the tests all pods, PV, PVCs, endpoints, secrets, etc. that were successfully created remain actively running. This allows the tester to inspect containers, exec into running containers and test file access, verify the container's user's ids, etc. Over time these types of manual container focused tests could be automated.
+
+There is no attempt to run *docker rm* to delete containers and reclaim their associated storage, so this should be done by the tester.
+ 
+Here's is the full syntax, which is displayed when no arguments are supplied:
 
 ```
   oc-test - execute one or more ose storage tests
@@ -73,9 +88,15 @@ DESCRIPTION
   -q         Suppress all prompts and reduce instructional output.
 ```
 
-### Examples:
- 1. To simply verify the target OSE environment, where "rhel7-ose-1" is the name of the OSE master host:
-  ```
+
+## Examples:
+The examples below show how to run *oc-test* to test gluster, nfs, ceph, or running all tests in one invocation. Note that to run test A and test B, simply specify *A,B* (no space) as the test argument value.
+
+
+### Example 1: verify the target OSE environment
+In this example "rhel7-ose-1" is the name of the OSE master host.
+
+```
   ./oc-test --verify --master rhel7-ose-1
   
   *** Only validating the environment on ose-master "rhel7-ose-1"
@@ -101,15 +122,19 @@ You have access to the following projects and can switch between them with 'oc p
  Supplied Sup GID: <none>
  Pod's Group ID  : 5555
 ===================================
-  ```
+```
 
- 2. To verify the target OSE environment and use a non-official version of origin (on the same master):
-  ```
+
+### Example 2: verify OSE env using non-official origin
+The ```--oc-prefix``` option allows the tester to build her own version of origin, specifying the path to the oc binary so that the script's *oc* commands use the correct copy of *oc*.
+
+```
 ./oc-test --verify --master rhel7-ose-1 --oc-prefix /root/origin/_output/local/bin/linux/amd64
-  ```
+```
 
- 3. To run the most basic test suite ("general" tests), which is the default if no tests are requested, using the same master host:
-  ```
+### Example 3: General tests
+The *general* test suite is the default test suite if no tests are requested.
+```
   ./oc-test --master rhel7-ose-1
 
 *** Will run 1 test on ose-master "rhel7-ose-1":
@@ -152,12 +177,13 @@ pod "general-pod2" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
-  Use ``` -q ``` to suppress the "continue" prompt and reduce instructional output.
+```
+  Use `-q` to suppress the "continue" prompt and reduce instructional output.
   
   
- 4. To run the **NFS** test suite where the NFS server is "f21-nfs":
-  ```
+### Example 4: NFS test suite
+In this example the NFS server is "f21-nfs".
+```
   ./oc-test --master rhel7-ose-1 --nfs-server f21-nfs  nfs
 
 *** Will run 1 test on ose-master "rhel7-ose-1":
@@ -244,12 +270,13 @@ pod "nfs-pod3" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
-  Again ``` -q ``` suppresses the continue prompt and the bulk of the nfs instructional output. Also ``` --sgid ``` can be supplied to set the Group ID in the busybox container, which is useful for various access/permissions issues.
-  
-  
- 5. To run the **Gluster** storage test suite:
-  ```
+```
+  Again `-q` suppresses the continue prompt and the bulk of the nfs instructional output. Also `--sgid` can be supplied to set the Group ID in the busybox container, which is useful for various access/permissions issues.
+
+
+### Example 5: Gluster storage test suite
+This example runs the gluster tests against an existing gluster cluster and volume.
+```
   ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm gluster
 
 *** Will run 1 test on ose-master "rhel7-ose-1":
@@ -333,9 +360,11 @@ pod "gluster-pod3" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
- 6. To run the **Ceph-RBD** test suite:
-  ```
+```
+
+### Example 6: Ceph-RBD test suite
+This example runs the ceph-rbd tests against an existing Ceph cluster, which is defined by a single monitor and an existing rbd image. In this case the ceph secret is generated from the monitor, but the ```--ceph-secret64``` option can be specified if there is no ssh access to the monitor.
+```
    ./oc-test --master rhel7-ose-1 --rbd-monitors 192.168.122.133 --rbd-image ceph-image rbd
 *** Will run 1 test on ose-master "rhel7-ose-1":
        rbd
@@ -417,10 +446,11 @@ pod "rbd-pod2" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
+```
 
- 7. To run **ALL** of the test suites in one fell swoop, somewhat quietly:
-  ```
+### Example 7: ALL test suites
+All tests in a single *oc-test* invocation and somewhat quietly.
+```
    ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm --nfs-server=f21-nfs  --rbd-monitors 192.168.122.133 --rbd-image ceph-image  all -q
    
    *** Will run 4 tests on ose-master "rhel7-ose-1":
@@ -554,9 +584,10 @@ pod "rbd-pod2" created
 ***
 *** Done with tests: 0 errors
 ***
-  ```
-  And on the OSE-master, here are the pods created by all of the storage tests:
-  ```
+```
+
+And on the OSE-master, here are the pods created by all of the storage tests:
+```
   oc get pod
 NAME           READY     STATUS    RESTARTS   AGE
 general-pod1   1/1       Running   0          3m
@@ -569,4 +600,4 @@ nfs-pod2       1/1       Running   0          2m
 nfs-pod3       1/1       Running   0          2m
 rbd-pod1       1/1       Running   0          1m
 rbd-pod2       1/1       Running   0          1m
-  ```
+```
