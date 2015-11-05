@@ -529,19 +529,19 @@ function validate_ose_env() {
   echo "... validated"
   echo
   echo "==================================="
-  echo " OSE master node      : $MASTER"
-  echo " OSE nodes            : ${OSE_NODES[@]}"
+  echo " OSE master node   : $MASTER"
+  echo " OSE nodes         : ${OSE_NODES[@]}"
   if (( ${#not_ready_nodes[@]} )) ; then
     echo "  ** these nodes are not scheduable:"
     echo "       ${not_ready_nodes[@]}"
   fi
-  echo " Current project      : \"$NS\""
-  echo "   User IDs           : $SUIDs"
-  echo "   Group IDs          : $SGIDs"
-  echo " Supplied Supl GIDs   : ${ARG_SGIDS:-<none>}"
-  echo " Supplied Block GID   : ${ARG_BLK_GID:-<none>}"
+  echo " Current project   : \"$NS\""
+  echo "   User IDs        : $SUIDs"
+  echo "   Group IDs       : $SGIDs"
+  echo " Supplied Supl GIDs: ${ARG_SGIDS:-<none>}"
+  echo " Supplied Block GID: ${ARG_BLK_GID:-<none>}"
   echo " Shared storage pod's GID: $USE_SGIDS"
-  echo " Blk storage pod's GID: $USE_BLK_GID"
+  echo " Blk storage pod's GID   : $USE_BLK_GID"
   echo "==================================="
   echo
 
@@ -873,6 +873,49 @@ function verify_nfs_setup() {
   return 0
 }
 
+# returns 1 on errors. Checks that gluster-client is installed (we can't check
+# for running), and that the correct selinux labels are set on all ose nodes.
+# $@=ose-nodes.
+function verify_gluster_setup() {
+
+  local nodes="$@"
+  local node; local out; local cnt
+  local bools=(virt_sandbox_use_fusefs virt_use_fusefs) # array
+  local bools_cnt=${#bools[@]}
+
+  echo "...checking that all OSE-nodes are setup for the gluster client..."
+  echo "   (May be prompted for your password on each node, possibly"
+  echo "    multiple times)..."
+
+  for node in $nodes; do
+     echo
+     echo "   *** on node: $node..."
+     # installed?
+     out="$(ssh $node "rpm -q glusterfs-fuse")"
+     if (( $? != 0 )) || [[ -z "$out" ]] ||
+        grep ' is not installed' <<<"$out" ; then
+       echo "ERROR: glusterfs-fuse seems to not be installed"
+       echo "       (or ssh $node error"
+       return 1
+     fi
+
+     # selinux fuse related bools set on?
+     out="$(ssh $node "getsebool ${bools[@]}")"
+     (( $? != 0 )) || [[ -z "$out" ]] && {
+       echo -e "ERROR: cannot get selinux fuse booleans:\n         ${bools[@]}";
+       return 1; }
+     cnt=$(grep -c ' on$' <<<"$out")
+     if (( cnt != bools_cnt )) ; then
+       echo -e "ERROR: only $cnt selinux bools are ON, expected $bools_cnt:\n$out"
+       echo "         $ setsebool -P <bool-name> 1  #sets these bools"
+       return 1
+     fi
+  done
+
+  echo "...all OSE-nodes are setup for the gluster client"
+  return 0
+}
+
 # If the passed-in gid is already a number then it is echo'd as-is and 0 is
 # returned. Otherwise, the passed-in gid is converted to its corresponding 
 # numeric value, via ssh to the passed-in target server, and the numberic
@@ -992,7 +1035,7 @@ function nfs_test() {
 
   # check the nfs setup on the ose nodes
   verify_nfs_setup ${OSE_NODES[@]} || {
-    echo "ERROR: cannot verify that NFS is setup correctly on all OSE-NODES";
+    echo "ERROR: cannot verify that NFS is setup correctly on all ose-nodes";
     return 1; }
 
   # get nfs vol mount perms from nfs server
@@ -1228,6 +1271,11 @@ function gluster_test() {
   echo
   echo "*** Gluster test suite ***"
   echo
+
+  # check the gluster setup on the ose nodes
+  verify_gluster_setup ${OSE_NODES[@]} || {
+    echo "ERROR: cannot verify that gluster is setup correctly on all ose-nodes";
+    return 1; }
 
   # get gluster vol mount perms
   node="${GLUSTER_NODES[0]}"
