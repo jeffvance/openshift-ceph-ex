@@ -862,7 +862,7 @@ function nfs_test() {
   echo "*** NFS test suite ***"
   echo
 
-  # get nfs server vol mount perms
+  # get vol mount perms from nfs server
   echo "Connecting to $NFS via ssh. You may need to enter a password."
   sleep 1
   echo
@@ -872,25 +872,44 @@ function nfs_test() {
     out=($out) # array
     vol_perms="${out[0]}"
     vol_gid="${out[3]}"
-    # append vol's sgid to pod's sgid?
+
+    # handle string gid
+    if [[ ! $vol_gid =~ ^[0-9]+$ ]] ; then # not all numeric
+echo "***String nfs vol id $vol_gid"
+      # get the numeric id from the NFS server
+      echo "Converting \"$vol_gid\" to its numeric value on $node..."
+      out="$(ssh $NFS "getent group $vol_gid | cut -d: -f3")"
+      if (( $? == 0 )) ; then
+        vol_gid="$out"
+      else
+        echo "WARN: unable to convert the NFS mount directory ${vol_mount}'s"
+        echo "  string GID \"$vol_gid\" to its numeric value. OSE doesn't"
+        echo "  support string GIDs in its ID range implementation. The mount's"
+        echo "  GID will be set to \"\" (nil)."
+        vol_gid=''
+      fi
+    fi
+
+  else
+    echo "WARN: cannot retrieve permissions on $vol_mount from NFS server"
+    echo "  \"$NFS\" via ssh. Be aware of potential permission mismatches"
+    echo "  between openshift supplemental groups and the NFS mount directory"
+    echo
+    echo "$out"
+  fi
+
+  # append nfs vol's sgid to pod's sgid?
+  if [[ -n "$vol_gid" ]] ; then
     if id_in_range $vol_gid "$SGIDs" ; then
       if (( vol_gid != USE_SGID )) ; then # append vol gid to supp gids
         sup_gids+=",$vol_gid"     
         echo "Pod's supplemental groups are: $sup_gids"
       fi
     else
-      echo "WARN: the NFS volume ${vol_mount}'s GID is NOT within the"
-      echo "      \"$NS\" project's range of group IDs: $SGIDs, and"
-      echo "      cannot be added to the pod's list of group IDs."
+      echo "WARN: the NFS volume ${vol_mount}'s GID of $vol_gid is NOT within"
+      echo "  the \"$NS\" project's range of group IDs: $SGIDs, and"
+      echo "  thus cannot be added to the pod's list of group IDs."
     fi
-
-  else
-    echo "WARN: cannot retrieve permissions on $vol_mount from NFS server"
-    echo "      \"$NFS\" via ssh. Be aware of potential permission mismatches"
-    echo "      between openshift supplemental groups and the NFS mount"
-    echo "      directory."
-    echo
-    echo "$out"
   fi
 
   # show more info for running these tests...
@@ -921,7 +940,7 @@ function nfs_test() {
 
     On the other hand, if it's ok to change the perms on $vol_mount to match
     openshift's range of groups, then execute (on $NFS):
-       $ chgrp $OS_SGID /opt/nfs && chmod g+srw /opt/nfs
+       $ chgrp $USE_SGID /opt/nfs
 
     Note: it may necessary to restart NFS:
        $ systemctl restart rpcbind nfs
@@ -1101,19 +1120,78 @@ END
 # run the "glusterfs" tests.
 function gluster_test() {
 
-  local pod; local node; local endpoints=''; local dmy
+  local pod; local node; local endpoints=''; local out
   local endpt='gluster-endpoints'; local pv; local pvc
+  local mnt_perms; local mnt_gid
+  local sup_gids=$USE_SGID # may have the gluster vol's gid appended
 
+  echo
+  echo "*** Gluster test suite ***"
+  echo
+
+  # get gluster vol mount perms
+  node="${GLUSTER_NODES[0]}"
+  echo "Connecting to $node via ssh. You may need to enter a password."
+  sleep 1
+  echo
+  out="$(ssh $node "
+          ( mnt=\$(mount |
+                   grep 'fuse.glusterfs' |
+                   grep $GLUSTER_VOL |
+                   awk '{print \$3}') # set remote mnt var
+            ls -ld \$mnt ) 2>&1
+         ")"
+  if (( $? == 0 )) ; then
+    out=($out) # array
+    mnt_perms="${out[0]}"
+    mnt_gid="${out[3]}"
+
+    # handle string gid
+    if [[ ! $mnt_gid =~ ^[0-9]+$ ]] ; then # not all numeric
+      # get the numeric id from the gluster storage node
+      echo "Converting \"$mnt_gid\" to its numeric value on $node..."
+      out="$(ssh $node "getent group $mnt_gid | cut -d: -f3")"
+      if (( $? == 0 )) ; then
+        mnt_gid="$out"
+      else
+        echo "WARN: unable to convert the \"$GLUSTER_VOL\" volume's mount's"
+        echo "  string GID \"$mnt_gid\" to its numeric value. OSE doesn't"
+        echo "  support string GIDs in its ID range implementation. The"
+        echo "  mount's GID will be set to \"\" (nil)."
+        mnt_gid=''
+      fi
+    fi
+  else
+    echo "WARN: cannot retrieve permissions for \"$GLUSTER_VOL\" from gluster"
+    echo "  node $node via ssh. Be aware of potential permission mismatches"
+    echo "  between openshift supplemental groups and the gluster mount."
+    echo
+    echo "$out"
+  fi
+
+  # append mnt's sgid to pod's sgid?
+  if [[ -n "$mnt_gid" ]] ; then
+    if id_in_range $mnt_gid "$SGIDs" ; then
+      if (( mnt_gid != USE_SGID )) ; then # append mount gid to supp gids
+        sup_gids+=",$mnt_gid"     
+        echo "Pod's supplemental groups are: $sup_gids"
+      fi
+    else
+      echo "WARN: the Gluster volume ${GLUSTER_VOL}'s GID of $mnt_gid is NOT"
+      echo "  within the \"$NS\" project's range of group IDs: $SGIDs,"
+      echo "  and thus cannot be added to the pod's list of group IDs."
+    fi
+  fi
+
+  # show more info for running these tests...
   if (( ! QUIET )) ; then
     cat <<END_GLUSTER
 
-*** Gluster test suite ***
-
     The supplied gluster storage nodes (endpoints) and the glusterfs plugin
     are tested using the busybox container to access the $GLUSTER_VOL volume.
-    On one of the gluster nodes, eg. ${GLUSTER_NODES[0]}, ensure that gluster
-    is running, that the "$GLUSTER_VOL" volume is active, and that the volume
-    mount exists. Eg:
+    On one of the gluster nodes, eg. $node, ensure that gluster is
+    running, the "$GLUSTER_VOL" volume is active, and the volume mount 
+    has the correct permissions. Eg:
        $ gluster peer status
        $ gluster volume status $GLUSTER_VOL
        $ mount | grep glusterfs
@@ -1121,13 +1199,30 @@ function gluster_test() {
        $ mount -a # assuming the vol mount is present in /etc/fstab
        # if the vol mount is not in /etc/fstab, then add it, eg:
        ${GLUSTER_NODES[0]}:/$GLUSTER_VOL /mnt/glusterfs/$GLUSTER_VOL glusterfs _netdev 0 0
-       # and make sure the bricks are mounted as well...
+       
+    The group ID for the "$GLUSTER_VOL" volume mount is:
+       ${mnt_gid:-<unavailable>}
+    and permissions on this volume's mount directory are:
+       ${mnt_perms:-<unavailable>}
 
-    On the ose nodes make sure to install the gluster-client.
+    To edit the range of supplemental group IDs, on \"$MASTER\", use:
+       $ oc edit ns $NS
+    and change the 'openshift.io/sa.scc.supplemental-groups' range to
+    include the ${GLUSTER_VOL}'s mount's group ID.  Also, use:
+       $ oc get ns $NS -o yaml
+    to see the values for various IDs in the "$NS" project.
+
+    On all of the OSE nodes make sure to:
+      $ yum install glusterfs-client
+      $ setsebool -P virt_sandbox_use_fusefs 1  # on, add the fusefs label
+      $ setenforce 1 # keep selinux enforcing
+
+    **NOTE: the setsebool command above. It is critical for enabling POSIX
+            file access from the target containers!!
 
 END_GLUSTER
   
-    read -p "Press any key to continue..." -t120 dmy
+    read -p "Press any key to continue..." -t120 out
   fi
 
   echo
@@ -1193,7 +1288,7 @@ END
 
   echo
   echo "----------"
-  echo "Gluster Test 2: busybox, glusterfs plugin, SGID $USE_SGID:"
+  echo "Gluster Test 2: busybox, glusterfs plugin, SGID $sup_gids:"
 
   pod='gluster-pod2'
   delete_pod $pod
@@ -1213,7 +1308,7 @@ spec:
     - name: gluster-vol2
       mountPath: /usr/share/busybox
   securityContext:
-    supplementalGroups: [$USE_SGID]
+    supplementalGroups: [$sup_gids]
     privileged: false
   volumes:
   - name: gluster-vol2
@@ -1231,7 +1326,7 @@ END
 
   echo
   echo "----------"
-  echo "Gluster Test 3: busybox, PV, PVC, SGID $USE_SGID:"
+  echo "Gluster Test 3: busybox, PV, PVC, SGID $sup_gids:"
 
   # a. create PV
   pv='gluster-pv'
@@ -1295,7 +1390,7 @@ spec:
     - name: gluster-vol3
       mountPath: /usr/share/busybox
   securityContext:
-    supplementalGroups: [$USE_SGID]
+    supplementalGroups: [$sup_gids]
     privileged: false
   volumes:
   - name: gluster-vol3
@@ -1364,7 +1459,7 @@ function rbd_test() {
       # provide the below output as the --ceph-secret64 value
       ceph auth get-key client.admin | base64
 
-      # on $MASTER:
+      # on each OSE worker node:
       yum install -y ceph-common
 
 END_RBD
