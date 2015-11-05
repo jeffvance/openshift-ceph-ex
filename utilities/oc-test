@@ -17,7 +17,7 @@
 # See usage() for syntax.
 #
 
-VERSION=0.9
+VERSION=0.91
 VERIFY_ONLY=0 # false
 MASTER="$HOSTNAME"
 OC_PREFIX=''
@@ -447,7 +447,8 @@ function get_current_namespace() {
 }
 
 # validate openshift env on passed-in node. Return 1 on error. If no 
-# validation errors then collected ose state variables are echoed. 
+# validation errors then collected ose state variables are echoed. Sets the
+# global array OSE_NODES.
 function validate_ose_env() {
 
   local out
@@ -465,6 +466,9 @@ function validate_ose_env() {
     return 1
   fi
 
+  # set OSE_NODES to the list of nodes
+  OSE_NODES=($(cut -d' ' -f1 <<<"$out" | tail -n +2)) # 1st col and skip NAMES
+
   # oc get scc
   out="$(ssh $MASTER "${OC_PREFIX}oc get scc")"
   if awk '{print $4}' <<<"$out" | grep -q false ; then #HOSTDIR col has a false
@@ -480,6 +484,7 @@ function validate_ose_env() {
   echo
   echo "==================================="
   echo " Master node     : $MASTER"
+  echo " OSE worker nodes: ${OSE_NODES[@]}"
   echo " Current project : $NS"
   echo "   Sup User IDs  : $SUIDs"
   echo "   Sup Group IDs : $SGIDs"
@@ -768,6 +773,52 @@ function verify_new_secret() {
   return 1
 }
 
+# returns 1 on errors. Checks that nfs-util and rpcbind are installed and
+# running, and that the correct selinux labels are set on all ose nodes.
+# $@=ose-nodes.
+function verify_nfs_setup() {
+
+  local nodes="$@"
+  local node; local out; local cnt
+  local bools=(openshift_use_nfs virt_use_nfs) # array
+  local bools_cnt=${#bools[@]}
+
+  echo "...checking that all OSE-nodes are setup for the NFS client..."
+  echo "   (May be prompted for your password on each node, possibly"
+  echo "    multiple times)..."
+
+  for node in $nodes; do
+     echo
+     echo "   *** on node: $node..."
+     # installed?
+     out="$(ssh $node "rpm -q nfs-utils rpcbind")"
+     (( $? != 0 )) && {
+       echo "ERROR: cannot access $node via ssh"; return 1; }
+     if grep ' is not installed' <<<"$out" ; then
+       echo -e "ERROR: nfs-util and/or rpcbind are not installed:\n$out"
+       return 1
+     fi
+
+     # running?
+     out="$(ssh $node "systemctl status nfs rpcbind")"
+     (( $? != 0 )) && {
+       echo -e "ERROR: nfs/rpcbind are not running:\n$out"; return 1; }
+
+     # selinux nfs related bools set on?
+     out="$(ssh $node "getsebool ${bools[@]}")"
+     (( $? != 0 )) || [[ -z "$out" ]] && {
+       echo -e "ERROR: cannot get selinux nfs booleans:\n         ${bools[@]}";
+       return 1; }
+     cnt=$(grep -c ' on$' <<<"$out")
+     (( cnt != bools_cnt )) && {
+       echo -e "ERROR: only $cnt selinux bools are ON, expected $bools_cnt:\n$out"; 
+       return 1; }
+  done
+
+  echo "...all OSE-nodes are setup for the NFS client"
+  return 0
+}
+
 # run the "general" tests.
 function general_test() {
 
@@ -850,11 +901,9 @@ END
 }
 
 # run the "nfs" tests.
-# Note: the user-specified --sgid is used in these tests. If omitted then the
-#  default openshift sgid is used.
 function nfs_test() {
 
-  local pod; local pv; local pvc; local out
+  local pod; local pv; local pvc; local out; local ssh_ok
   local vol_mount='/opt/nfs'; local vol_perms; local vol_gid
   local sup_gids=$USE_SGID # may have the nfs vol's gid appended
 
@@ -862,11 +911,12 @@ function nfs_test() {
   echo "*** NFS test suite ***"
   echo
 
-  # get vol mount perms from nfs server
-  echo "Connecting to $NFS via ssh. You may need to enter a password."
-  sleep 1
-  echo
+  # check the nfs setup on the ose nodes
+  verify_nfs_setup ${OSE_NODES[@]} || {
+    echo "ERROR: cannot verify that NFS is setup correctly on all OSE-NODES";
+    return 1; }
 
+  # get nfs vol mount perms from nfs server
   out="$(ssh $NFS "ls -ld $vol_mount 2>&1")"
   if (( $? == 0 )) ; then
     out=($out) # array
@@ -875,7 +925,6 @@ function nfs_test() {
 
     # handle string gid
     if [[ ! $vol_gid =~ ^[0-9]+$ ]] ; then # not all numeric
-echo "***String nfs vol id $vol_gid"
       # get the numeric id from the NFS server
       echo "Converting \"$vol_gid\" to its numeric value on $node..."
       out="$(ssh $NFS "getent group $vol_gid | cut -d: -f3")"
