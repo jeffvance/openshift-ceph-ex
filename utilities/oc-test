@@ -810,9 +810,11 @@ function verify_nfs_setup() {
        echo -e "ERROR: cannot get selinux nfs booleans:\n         ${bools[@]}";
        return 1; }
      cnt=$(grep -c ' on$' <<<"$out")
-     (( cnt != bools_cnt )) && {
-       echo -e "ERROR: only $cnt selinux bools are ON, expected $bools_cnt:\n$out"; 
-       return 1; }
+     if (( cnt != bools_cnt )) ; then
+       echo -e "ERROR: only $cnt selinux bools are ON, expected $bools_cnt:\n$out"
+       echo "         $ setsebool -P <bool-name> 1  #sets these bools"
+       return 1
+     fi
   done
 
   echo "...all OSE-nodes are setup for the NFS client"
