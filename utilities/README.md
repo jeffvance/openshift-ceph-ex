@@ -182,7 +182,14 @@ pod "general-pod2" created
   
   
 ### Example 4: NFS test suite
-In this example the NFS server is "f21-nfs".
+The NFS setup on all OSE worker nodes is checked to ensure that nfs has been installed properly, that nfs and rpcbind are running, and that the correct selinux booleans are set ON. The required SE booleans are:
+  - nfs_export_all_ro --> on
+  - nfs_export_all_rw --> on
+  - nfsd_anon_write --> off
+  - openshift_use_nfs --> on
+  - virt_use_nfs --> on
+
+However, the script only verifies that *openshift_use_nfs* and *virt_use_nfs* are ON, since the other flags seem to be on by default. In this example the NFS server is "f21-nfs".
 ```
   ./oc-test --master rhel7-ose-1 --nfs-server f21-nfs  nfs
 
