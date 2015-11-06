@@ -17,7 +17,7 @@
 # See usage() for syntax.
 #
 
-VERSION=0.91
+VERSION=0.92
 VERIFY_ONLY=0 # false
 MASTER="$HOSTNAME"
 OC_PREFIX=''
@@ -529,7 +529,7 @@ function validate_ose_env() {
 
   echo "... validated"
   echo
-  echo "==================================="
+  echo "============================================="
   echo " OSE master node   : $MASTER"
   echo " OSE nodes         : ${OSE_NODES[@]}"
   if (( ${#not_ready_nodes[@]} )) ; then
@@ -539,11 +539,14 @@ function validate_ose_env() {
   echo " Current project   : \"$NS\""
   echo "   User IDs        : $SUIDs"
   echo "   Group IDs       : $SGIDs"
-  echo " Supplied Supl GIDs: ${ARG_SGIDS:-<none>}"
-  echo " Supplied Block GID: ${ARG_BLK_GID:-<none>}"
-  echo " Shared storage pod's GID: $USE_SGIDS"
-  echo " Blk storage pod's GID   : $USE_BLK_GID"
-  echo "==================================="
+  echo "   Default SGID    : $OS_SGID"
+  [[ -n "$ARG_SGIDS" ]] &&
+    echo " Additional SGIDs  : $ARG_SGIDS  (from cmd args)"
+  [[ -n "$ARG_BLK_GID" ]] &&
+    echo " Additional blk GID: $ARG_BLK_GID  (from cmd args)"
+  echo " Shared storage pod's GID : $USE_SGIDS"
+  echo " Blk storage pod's FSGroup: $USE_BLK_GID"
+  echo "============================================="
   echo
 
   return 0
@@ -1089,12 +1092,12 @@ function nfs_test() {
   echo "*** NFS test suite ***"
   echo
 
-  # check the nfs setup on the ose nodes
-  verify_nfs_setup ${OSE_NODES[@]} || {
-    echo "ERROR: cannot verify that NFS is setup correctly on all ose-nodes";
-    return 1; }
-
   # get nfs vol mount perms from nfs server
+  echo "Connecting to NFS server $NFS via ssh."
+  echo "You may need to enter a password."
+  sleep 1
+  echo
+
   out="$(ssh $NFS "ls -ld $vol_mount 2>&1")"
   if (( $? == 0 )) ; then
     out=($out) # array
@@ -1148,6 +1151,11 @@ END_NFS
 
     read -p "Press any key to continue..." -t120 out
   fi
+
+  # check the nfs setup on the ose nodes
+  verify_nfs_setup ${OSE_NODES[@]} || {
+    echo "ERROR: cannot verify that NFS is setup correctly on all ose-nodes";
+    return 1; }
 
   echo
   echo "----------"
@@ -1317,11 +1325,6 @@ function gluster_test() {
   echo "*** Gluster test suite ***"
   echo
 
-  # check the gluster setup on the ose nodes
-  verify_gluster_setup ${OSE_NODES[@]} || {
-    echo "ERROR: cannot verify that gluster is setup correctly on all ose-nodes";
-    return 1; }
-
   # get gluster vol mount perms
   node="${GLUSTER_NODES[0]}"
   echo "Connecting to $node via ssh. You may need to enter a password."
@@ -1390,6 +1393,11 @@ END_GLUSTER
   
     read -p "Press any key to continue..." -t120 out
   fi
+
+  # check the gluster setup on the ose nodes
+  verify_gluster_setup ${OSE_NODES[@]} || {
+    echo "ERROR: cannot verify that gluster is setup correctly on all ose-nodes";
+    return 1; }
 
   echo
   echo "----------"
@@ -1823,6 +1831,7 @@ function execute_tests() {
 
 ## main ##
 
+echo
 parse_cmd $@ || exit -1
 
 NS="$(get_current_namespace)"
@@ -1830,21 +1839,15 @@ NS="$(get_current_namespace)"
 # set supplemental group and user IDs as globals
 get_supplemental_ids $NS || exit 1
 
-echo
-if (( VERIFY_ONLY )) ; then
-  echo "*** Only validating the environment on ose-master \"$MASTER\""
-else
+validate_ose_env || exit 1
+
+if (( ! VERIFY_ONLY )) ; then
   (( NUM_TESTS > 1 )) && plural='s' || plural=''
   echo "*** Will run $NUM_TESTS test$plural on ose-master \"$MASTER\":"
   for test in ${TESTS[@]}; do
      echo "       $test"
   done
+  execute_tests ${TESTS[@]} || exit 1
 fi
-echo
-sleep 2
-
-validate_ose_env || exit 1
-
-(( ! VERIFY_ONLY )) && execute_tests ${TESTS[@]} || exit 1
 
 exit 0
