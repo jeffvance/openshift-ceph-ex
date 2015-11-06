@@ -738,35 +738,53 @@ function verify_perms() {
       ")"
   # it appears that $? will be 0 even with a perms denied error...
   err=0 # assume no error
-  grep -q 'Permission denied' <<<"$out" && err=1 #error!
+  grep -q -E 'Permission denied|No such file' <<<"$out" && err=1 #error!
 
   (( err == expt_pass )) && return 0 # perms test worked as expected
   return 1 # didn't get expected results
 }
 
-# returns 0 if the passed-in pod is running. Echos "oc get pod" output for all
-# errors.
-# $1= pod-name
+# returns 0 if the passed-in pod is running, has the expected mount, and has the
+# expected access (perms) to the busybox dir.
+#  $1= pod-name,
+#  $2= PASS|FAIL flag (optional),
+#  $3= mount type (optional) -- nfs, glusterfs
 function verify_new_pod() {
 
-  local pod="$1"
+  local pod="$1"; local pf="$2"; local mnt_type="$3"
   local i; local MAX=60 # num tries
   local SLEEP=3; local out
 
   echo "... checking pod \"$pod\" ..."
 
+  # pod Running?
   for ((i=0; i<$MAX; i++)); do
      sleep $SLEEP
      out="$(ssh $MASTER "${OC_PREFIX}oc get pod $pod 2>&1")"
      (( $? != 0 )) && {
        echo "$out"; return 1; }
      if awk '{print $2}' <<<"$out" | grep -q '1/1' ; then # READY column
-       return 0 # success
+       break # success
      fi
   done
 
-  echo -e "ERROR: $(((MAX*SLEEP))) seconds waiting for pod \"$pod\" to start:\n$out"
-  return 1
+  (( i >= MAX )) && {
+    echo -e "ERROR: $(((MAX*SLEEP))) seconds waiting for pod \"$pod\" to start:\n$out";
+    return 1; }
+
+  # check mount?
+  if [[ -n "$mnt_type" ]] ; then
+    verify_mount $mnt_type $pod || {
+      echo "ERROR: expected \"$mnt_type\" mount missing"; return 1; }
+  fi
+
+  # verify perms?
+  if [[ -n "$pf" ]] ; then
+    verify_perms $pod $pf || {
+      echo "ERROR: permission test failed"; return 1; }
+  fi
+
+  return 0
 }
 
 # returns 0 if the passed-in PV is running.
@@ -973,7 +991,7 @@ function handle_gid_string() {
 # run the "general" tests.
 function general_test() {
 
-  local pod
+  local pod; local node
 
   if (( ! QUIET )) ; then
     cat <<END_GENERAL
@@ -989,7 +1007,9 @@ END_GENERAL
 
   echo
   echo "----------"
-  echo "General Test 1: busybox, emptyDir, SGIDs: $USE_SGIDS"
+  echo "General Test 1: baseline: busybox, emptyDir"
+  echo "  (no supplementalGroups defined for this pod)"
+  echo
 
   pod='general-pod1'
   delete_pod $pod
@@ -1007,19 +1027,27 @@ spec:
     image: busybox
     command: ["sleep", "60000"]
   securityContext:
-    supplementalGroups: [$USE_SGIDS]
     privileged: false
 END
 
   verify_new_pod $pod || {
-    echo "ERROR: general test #1"; return 1; }
+    echo "ERROR: general test #1: see above pod \"$pod\" error"; return 1; }
 
   echo
   echo "----------"
-  echo "General Test 2: busybox, hostPath plugin, SGIDs: $USE_SGIDS"
+  echo "General Test 2: busybox, hostPath, SGIDs: $USE_SGIDS"
+  echo
 
   pod='general-pod2'
   delete_pod $pod
+
+  # create /opt/data on all ose-nodes for this test
+  echo
+  echo "...checking that all OSE-nodes have the /opt/data directory..."
+  echo "   (May be prompted for your password on each node)"
+  for node in ${OSE_NODES[@]}; do
+    ssh -q $node "mkdir -p /opt/data"
+  done
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
 apiVersion: v1
@@ -1034,19 +1062,19 @@ spec:
     image: busybox
     command: ["sleep", "60000"]
     volumeMounts:
-    - name: bb-vol
-      mountPath: $$BB_DIR
+    - name: bb-vol2
+      mountPath: $BB_DIR
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
   volumes:
-  - name: bb-vol
+  - name: bb-vol2
     hostPath:
       path: /opt/data
 END
 
-  verify_new_pod $pod || {
-    echo "ERROR: general test #2"; return 1; }
+  verify_new_pod $pod PASS || {
+    echo "ERROR: general test #2: see above pod \"$pod\" error"; return 1; }
 
   return 0
 }
@@ -1125,6 +1153,7 @@ END_NFS
   echo "----------"
   echo "NFS Test 1: baseline: busybox, nfs plugin"
   echo "  (no supplementalGroups defined for this pod)"
+  echo
 
   pod='nfs-pod1'
   delete_pod $pod
@@ -1154,24 +1183,13 @@ spec:
       readOnly: false
 END
 
-  if ! verify_new_pod $pod ; then
-    echo "ERROR nfs test 1: pod $pod not Running"
-    echo "  Try restarting rpcbind and nfs on the nfs server \"$NFS\"."
-    echo "  Also make sure that port 2049 on the NFS server is open, eg:"
-    echo "    iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT"
-    return 1
-  fi
-
-  verify_mount nfs $pod || {
-    echo "ERROR nfs test 1: expected nfs mount missing"; return 1; }
-
-  # exec into pod to verify perms
-  verify_perms $pod FAIL || {
-    echo "ERROR nfs test 1: expected nfs mount missing"; return 1; }
+  verify_new_pod $pod FAIL nfs || {
+    echo "ERROR nfs test 1: see above pod \"$pod\" error"; return 1; }
 
   echo
   echo "----------"
   echo "NFS Test 2: busybox, nfs plugin, SGIDs: $USE_SGIDS"
+  echo
 
   pod='nfs-pod2'
   delete_pod $pod
@@ -1202,15 +1220,13 @@ spec:
       readOnly: false
 END
 
-  verify_new_pod $pod || {
-    echo "ERROR nfs test 2: pod $pod not Running"; return 1; }
-
-  verify_mount nfs $pod || {
-    echo "ERROR nfs test 2: expected nfs mount missing"; return 1; }
+  verify_new_pod $pod PASS nfs || {
+    echo "ERROR nfs test 2: see above pod \"$pod\" error"; return 1; }
 
   echo
   echo "----------"
   echo "NFS Test 3: busybox, PV, PVC, SGIDs: $USE_SGIDS"
+  echo
 
   # a. create PV
   pv='nfs-pv'
@@ -1284,11 +1300,8 @@ spec:
       claimName: $pvc
 END
 
-  verify_new_pod $pod || {
+  verify_new_pod $pod PASS nfs || {
     echo "ERROR nfs test 3: pod $pod not Running"; return 1; }
-
-  verify_mount nfs $pod || {
-    echo "ERROR nfs test 3: expected nfs mount missing"; return 1; }
 
   return 0
 }
@@ -1382,6 +1395,7 @@ END_GLUSTER
   echo "----------"
   echo "Gluster Test 1: baseline: busybox, glusterfs plugin"
   echo "  (no supplementalGroups defined for this pod)"
+  echo
 
   # a. create endpoints
   delete_endpoint $endpt
@@ -1436,15 +1450,13 @@ spec:
       readOnly: false
 END
 
-  verify_new_pod $pod || {
+  verify_new_pod $pod FAIL glusterfs || {
     echo "ERROR gluster test 1: pod $pod not Running"; return 1; }
-
-  verify_mount glusterfs $pod || {
-    echo "ERROR gluster test 1: expected glusterfs mount missing"; return 1; }
 
   echo
   echo "----------"
   echo "Gluster Test 2: busybox, glusterfs plugin, SGIDs: $USE_SGIDS"
+  echo
 
   pod='gluster-pod2'
   delete_pod $pod
@@ -1474,15 +1486,13 @@ spec:
       readOnly: false
 END
 
-  verify_new_pod $pod || {
+  verify_new_pod $pod PASS glusterfs || {
     echo "ERROR gluster test 2: pod $pod not Running"; return 1; }
-
-  verify_mount glusterfs $pod || {
-    echo "ERROR gluster test 2: expected glusterfs mount missing"; return 1; }
 
   echo
   echo "----------"
   echo "Gluster Test 3: busybox, PV, PVC, SGIDs: $USE_SGIDS"
+  echo
 
   # a. create PV
   pv='gluster-pv'
@@ -1554,11 +1564,8 @@ spec:
       claimName: $pvc
 END
 
-  verify_new_pod $pod || {
+  verify_new_pod $pod PASS glusterfs || {
     echo "ERROR gluster test 3: pod $pod not Running"; return 1; }
-
-  verify_mount glusterfs $pod || {
-    echo "ERROR gluster test 3: expected glusterfs mount missing"; return 1; }
 
   return 0
 }
@@ -1627,6 +1634,7 @@ END_RBD
   echo "----------"
   echo "RBD Test 1: baseline: busybox, ceph-rbd plugin"
   echo "  (no supplementalGroups defined for this pod)"
+  echo
 
   # a. create ceph-secret
   delete_secret $secret_name
@@ -1692,6 +1700,7 @@ END
   echo
   echo "----------"
   echo "RBD Test 2: busybox, ceph-rbd plugin, PV, PVC, FSGroup: $USE_BLK_GID"
+  echo
 
   # a. create pv
   pv='rbd-pv'
