@@ -282,7 +282,9 @@ pod "nfs-pod3" created
 
 
 ### Example 5: Gluster storage test suite
-This example runs the gluster tests against an existing gluster cluster and volume.
+This example runs the gluster tests against an existing gluster cluster and volume. The gluster setup on all OSE worker nodes is checked to ensure that gluster has been installed, and that the correct selinux booleans are set ON. The required SE booleans are:
+  - virt_sandbox_use_fusefs --> on
+  - virt_sandbox_use_fusefs --> on
 ```
   ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm gluster
 
