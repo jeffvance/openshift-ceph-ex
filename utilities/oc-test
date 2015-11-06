@@ -21,6 +21,7 @@ VERSION=0.91
 VERIFY_ONLY=0 # false
 MASTER="$HOSTNAME"
 OC_PREFIX=''
+BB_DIR='/usr/share/busybox'
 # test vars
 ALL_TESTS='general,nfs,gluster,rbd'
 TESTS='general' # default
@@ -708,12 +709,39 @@ function verify_mount() {
   # first check mount inside container
   out="$(ssh $MASTER "${OC_PREFIX}oc exec $pod mount | grep $mnt 2>&1")"
   if (( $? == 0 )) && [[ -n "$out" ]] &&
-     grep -q '/usr/share/busybox' <<<"$out" ; then
+     grep -q "$BB_DIR" <<<"$out" ; then
     return 0 # success
   fi
 
   echo -e "ERROR: $mnt mount missing in pod $pod:\n$out"
   return 1
+}
+
+# returns 0 if the passed-in pod's container has access the the standard
+# busybox volume (dir).
+# Args: $1=pod-name, $2=PASS|FAIL (expected result)
+# Note: this function should only be called after the target pod as been
+#   verified to be Running.
+function verify_perms() {
+
+  local pod="$1"; local pf=$2
+  local out; local expt_pass; local err
+
+  # expt_pass=0 --> want pass, expt_pass=1 --> want fail
+  [[ "$pf" == 'PASS' ]] && expt_pass=0 || expt_pass=1
+
+  echo "... checking perms to $BB_DIR on pod \"$pod\" ..."
+
+  # exeute ls in target pod/container (some trickery...)
+  out="$(ssh $MASTER "
+         ${OC_PREFIX}oc exec $pod -- sh -c 'echo \"\$(ls $BB_DIR 2>&1)\"'
+      ")"
+  # it appears that $? will be 0 even with a perms denied error...
+  err=0 # assume no error
+  grep -q 'Permission denied' <<<"$out" && err=1 #error!
+
+  (( err == expt_pass )) && return 0 # perms test worked as expected
+  return 1 # didn't get expected results
 }
 
 # returns 0 if the passed-in pod is running. Echos "oc get pod" output for all
@@ -1007,7 +1035,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: bb-vol
-      mountPath: /usr/share/busybox
+      mountPath: $$BB_DIR
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1115,7 +1143,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: nfs-vol1
-      mountPath: /usr/share/busybox
+      mountPath: $BB_DIR
   securityContext:
       privileged: false
   volumes:
@@ -1135,7 +1163,11 @@ END
   fi
 
   verify_mount nfs $pod || {
-    echo "ERROR nfs test 1: expected glusterfs mount missing"; return 1; }
+    echo "ERROR nfs test 1: expected nfs mount missing"; return 1; }
+
+  # exec into pod to verify perms
+  verify_perms $pod FAIL || {
+    echo "ERROR nfs test 1: expected nfs mount missing"; return 1; }
 
   echo
   echo "----------"
@@ -1158,7 +1190,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: nfs-vol2
-      mountPath: /usr/share/busybox
+      mountPath: $BB_DIR
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1174,7 +1206,7 @@ END
     echo "ERROR nfs test 2: pod $pod not Running"; return 1; }
 
   verify_mount nfs $pod || {
-    echo "ERROR nfs test 2: expected glusterfs mount missing"; return 1; }
+    echo "ERROR nfs test 2: expected nfs mount missing"; return 1; }
 
   echo
   echo "----------"
@@ -1242,7 +1274,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: nfs-vol3
-      mountPath: /usr/share/busybox
+      mountPath: $BB_DIR
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1256,7 +1288,7 @@ END
     echo "ERROR nfs test 3: pod $pod not Running"; return 1; }
 
   verify_mount nfs $pod || {
-    echo "ERROR nfs test 3: expected glusterfs mount missing"; return 1; }
+    echo "ERROR nfs test 3: expected nfs mount missing"; return 1; }
 
   return 0
 }
@@ -1393,7 +1425,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: gluster-vol1
-      mountPath: /usr/share/busybox
+      mountPath: $BB_DIR
   securityContext:
       privileged: false
   volumes:
@@ -1430,7 +1462,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: gluster-vol2
-      mountPath: /usr/share/busybox
+      mountPath: $BB_DIR
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1512,7 +1544,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: gluster-vol3
-      mountPath: /usr/share/busybox
+      mountPath: $BB_DIR
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1634,7 +1666,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: rbd-vol1
-      mountPath: /usr/share/busybox
+      mountPath: $BB_DIR
   securityContext:
     privileged: false
   volumes:
@@ -1727,7 +1759,7 @@ spec:
     command: ["sleep", "60000"]
     volumeMounts:
     - name: rbd-vol2
-      mountPath: /usr/share/busybox
+      mountPath: $BB_DIR
   securityContext:
     fsGroup: $USE_BLK_GID
     privileged: false
