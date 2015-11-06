@@ -376,14 +376,14 @@ function id_in_range() {
 function get_supplemental_ids() {
 
   local ns="$1"
-  local out; local ids; local id
+  local out; local id
 
   out="$(ssh $MASTER "${OC_PREFIX}oc get ns $ns -o yaml")"
 
   # SGIDs:
-  ids="$(grep 'openshift.io/sa.scc.supplemental-groups:' <<<"$out")"
-  SGIDs="${ids#*: }"  # remove the property name
-  id="${SGIDs%%,*}"   # first range
+  SGIDs="$(grep 'openshift.io/sa.scc.supplemental-groups:' <<<"$out")"
+  SGIDs="${SGIDs#*: }" # remove the property name
+  id="${SGIDs%%,*}" # first range
 
   # get ose default sgid
   if [[ $id == *"/"* ]] ; then # <start>/<count> form
@@ -398,11 +398,11 @@ function get_supplemental_ids() {
   if [[ -n "$ARG_SGIDS" ]] ; then
     # error if the supplied sgids are not w/in at least 1 of the ose ranges
     if ! id_in_range $ARG_SGIDS "$SGIDs" ; then
-      echo "ERROR: supplied SGIDs of \"$ARG_SGIDS\" not within the range of"
+      echo "ERROR: supplied SGIDs of \"$ARG_SGIDS\" is not within the range of"
       echo "  supplemental group IDs defined for the \"$NS\" project."
       echo "  Openshift's SGID range is: \"$SGIDs\"."
       echo "  Either supply a different --sgids= value or change the"
-      echo "  'openshift.io/sa.scc.supplemental-groups' range using:"
+      echo "  'openshift.io/sa.scc.supplemental-groups' 1st range using:"
       echo "    $ oc edit ns $NS"
       return 1
     fi
@@ -410,14 +410,30 @@ function get_supplemental_ids() {
     USE_SGIDS="$ARG_SGIDS,$OS_SGID"
   fi
 
-  # for block storage, use either the ose default gid or the user-supplied
-  # --block-gid number
-  USE_BLK_GID=${ARG_BLK_GID:-$OS_SGID}
+  # for block storage, if the user supplied --block-gid then validate that
+  # value and use it. Else, use the default FSGroup id, which is the same as
+  # the default shared SGID, which is the 1st number in the 1st range.
+  # ose default sgid
+  USE_BLK_GID=$OS_SGID # default
+  if [[ -n "$ARG_BLK_GID" ]] ; then
+    # error if the supplied gid is not w/in at least 1 of the ose ranges
+    if ! id_in_range $ARG_BLK_GID "$SGIDs" ; then
+      echo "ERROR: supplied block GID of \"$ARG_BLK_GID\" is not within the range"
+      echo "  of supplemental group IDs defined for the \"$NS\" project."
+      echo "  Openshift's SGID range is: \"$SGIDs\"."
+      echo "  Either supply a different --block-gid= value or change the"
+      echo "  'openshift.io/sa.scc.supplemental-groups' 1st range using:"
+      echo "    $ oc edit ns $NS"
+      return 1
+    fi
+    # ok to use the supplied block gid
+    USE_BLK_GID=$ARG_BLK_GID
+  fi
 
   # SUIDs:
-  ids="$(grep 'openshift.io/sa.scc.uid-range:' <<<"$out")"
-  SUIDs="${ids#*: }"  # remove the property name
-  id="${SUIDs%%,*}"   # first range
+  SUIDs="$(grep 'openshift.io/sa.scc.uid-range:' <<<"$out")"
+  SUIDs="${SUIDs#*: }" # remove the property name
+  id="${SUIDs%%,*}" # first range
 
   if [[ $id == *"/"* ]] ; then # <start>/<count> form
     OS_SUID=${id%/*} # first number in range
@@ -747,8 +763,9 @@ function verify_perms() {
   return 1 # didn't get expected results
 }
 
-# returns 0 if the passed-in pod is running, has the expected mount, and has the
-# expected access (perms) to the busybox dir.
+# returns 0 if the passed-in pod is running, has the expected mount, and has
+# the expected access (perms) to the busybox dir. Note: both the perms and
+# mount checks are optional.
 #  $1= pod-name,
 #  $2= PASS|FAIL flag (optional),
 #  $3= mount type (optional) -- nfs, glusterfs
@@ -944,7 +961,7 @@ function verify_gluster_setup() {
      if (( $? != 0 )) || [[ -z "$out" ]] ||
         grep ' is not installed' <<<"$out" ; then
        echo "ERROR: glusterfs-fuse seems to not be installed"
-       echo "       (or ssh $node error"
+       echo "       (or ssh $node error)"
        return 1
      fi
 
@@ -962,6 +979,51 @@ function verify_gluster_setup() {
   done
 
   echo "...all OSE-nodes are setup for the gluster client"
+  return 0
+}
+
+# returns 1 on errors. Checks that ceph-common is installed (we can't check
+# for running), and that the correct selinux labels are set on all ose nodes.
+# Note: as of now it's not well understood which labels are required for ceph.
+# $@=ose-nodes.
+function verify_ceph_setup() {
+
+  local nodes="$@"
+  local node; local out; local cnt
+  local bools=(X Y) # array
+  local bools_cnt=${#bools[@]}
+
+  echo "...checking that all OSE-nodes have ceph-common installed"
+  echo "   (May be prompted for your password on each node, possibly"
+  echo "    multiple times)..."
+
+  for node in $nodes; do
+     echo
+     echo "   *** on node: $node..."
+     # installed?
+     out="$(ssh $node "rpm -q ceph-common")"
+     if (( $? != 0 )) || [[ -z "$out" ]] ||
+        grep ' is not installed' <<<"$out" ; then
+       echo "ERROR: ceph-common seems to not be installed"
+       echo "       (or ssh $node error)"
+       return 1
+     fi
+
+     # selinux ceph-rbd related bools set on?
+     ### unknown at this time, so this check is commented out
+     #out="$(ssh $node "getsebool ${bools[@]}")"
+     #(( $? != 0 )) || [[ -z "$out" ]] && {
+       #echo -e "ERROR: cannot get selinux fuse booleans:\n         ${bools[@]}";
+       #return 1; }
+     #cnt=$(grep -c ' on$' <<<"$out")
+     #if (( cnt != bools_cnt )) ; then
+       #echo -e "ERROR: only $cnt selinux bools are ON, expected $bools_cnt:\n$out"
+       #echo "         $ setsebool -P <bool-name> 1  #sets these bools"
+       #return 1
+     #fi
+  done
+
+  echo "...all OSE-nodes are setup for ceph"
   return 0
 }
 
@@ -1000,8 +1062,8 @@ function general_test() {
     cat <<END_GENERAL
 *** General test suite ***"
 
-    These baseline tests test that SGID $SUSE_GID works in emptyDir and in
-    hostPath. No PVs or claims are used here.
+    These baseline tests test that the SGIDs $USE_SGIDS works in emptyDir
+    and in hostPath. No PVs or claims are used here.
 
 END_GENERAL
 
@@ -1459,7 +1521,7 @@ spec:
 END
 
   verify_new_pod $pod FAIL glusterfs || {
-    echo "ERROR gluster test 1: pod $pod not Running"; return 1; }
+    echo "ERROR gluster test 1: see above pod \"$pod\" error"; return 1; }
 
   echo
   echo "----------"
@@ -1495,7 +1557,7 @@ spec:
 END
 
   verify_new_pod $pod PASS glusterfs || {
-    echo "ERROR gluster test 2: pod $pod not Running"; return 1; }
+    echo "ERROR gluster test 2: see above pod \"$pod\" error"; return 1; }
 
   echo
   echo "----------"
@@ -1573,7 +1635,7 @@ spec:
 END
 
   verify_new_pod $pod PASS glusterfs || {
-    echo "ERROR gluster test 3: pod $pod not Running"; return 1; }
+    echo "ERROR gluster test 3: see above pod \"$pod\" error"; return 1; }
 
   return 0
 }
@@ -1581,7 +1643,7 @@ END
 # run the "ceph-rbd" tests.
 function rbd_test() {
 
-  local pod; local pv; local pvc; local dmy
+  local pod; local pv; local pvc; local out
   local mon; local monitors=''; local pool; local image
   local secret_name='ceph-secret'
 
@@ -1599,7 +1661,6 @@ function rbd_test() {
     echo "Calculating base64 ceph secret value..."
     echo "Connecting to $mon via ssh. You may need to enter a password."
     sleep 1
-    echo
 
     out="$(ssh $mon "ceph auth get-key client.admin | base64")"
     if (( $? != 0 )) || [[ -z "$out" ]] ; then
@@ -1611,37 +1672,42 @@ function rbd_test() {
     fi
     CEPH_SECRET64="$out"
     echo "Computed ceph secret: $CEPH_SECRET64"
-    echo
   fi
 
   if (( ! QUIET )) ; then
     cat <<END_RBD
+
     Busybox is run with a volume mounted via the RBD plugin. The ceph user is
     currently hard-coded to "admin" and the file system is assumed to be ext4.
     (Both of these assumptions can easily be removed and added as script args.) 
 
     Ceph needs to be installed and running correctly. Here are a few tips to 
     perform on one of the monitors (eg. ${MONITORS[0]}):
-      rbd create ceph-image -s 1024  # create the image
-      rbd map ceph-image             # map the image to the default pool, 'rbd'
-      rbd showmapped
-      ls /dev/rbd*                   # see which /dev/rbd device is used
-      mkfs.ext4 /dev/rbd0            # create the file system
+      $ rbd create ceph-image -s 1024  # create the image
+      $ rbd map ceph-image             # map image to the default ('rbd') pool
+      $ rbd showmapped
+      $ ls /dev/rbd*                   # see which /dev/rbd device is used
+      $ mkfs.ext4 /dev/rbd0            # create the file system
       # provide the below output as the --ceph-secret64 value
-      ceph auth get-key client.admin | base64
+      $ ceph auth get-key client.admin | base64
 
       # on each OSE worker node:
-      yum install -y ceph-common
+      $ yum install -y ceph-common
 
 END_RBD
   
-    read -p "Press any key to continue..." -t120 dmy
+    read -p "Press any key to continue..." -t120 out
   fi
+
+  # check the ceph setup on the ose nodes
+  verify_ceph_setup ${OSE_NODES[@]} || {
+    echo "ERROR: cannot verify that ceph is setup correctly on all ose-nodes";
+    return 1; }
 
   echo
   echo "----------"
   echo "RBD Test 1: baseline: busybox, ceph-rbd plugin"
-  echo "  (no supplementalGroups defined for this pod)"
+  echo "  (no fsGroup defined for this pod)"
   echo
 
   # a. create ceph-secret
@@ -1699,11 +1765,8 @@ $monitors
       readOnly: false
 END
 
-  verify_new_pod $pod || {
-    echo "ERROR rbd test 1: pod $pod not Running"; return 1; }
-
-  verify_mount rbd $pod || {
-    echo "ERROR rbd test 1: expected rbd mount missing"; return 1; }
+  verify_new_pod $pod PASS rbd || {
+    echo "ERROR rbd test 1: see above pod \"$pod\" error"; return 1; }
 
   echo
   echo "----------"
@@ -1786,11 +1849,8 @@ spec:
       claimName: $pvc
 END
 
-  verify_new_pod $pod || {
-    echo "ERROR rbd test 2: pod $pod not Running"; return 1; }
-
-  verify_mount rbd $pod || {
-    echo "ERROR rbd test 2: expected rbd missing"; return 1; }
+  verify_new_pod $pod PASS rbd || {
+    echo "ERROR rbd test 2: see above pod \"$pod\" error"; return 1; }
 
   return 0
 }
