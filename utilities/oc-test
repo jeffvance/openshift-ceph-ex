@@ -737,30 +737,54 @@ function verify_mount() {
 }
 
 # returns 0 if the passed-in pod's container has access the the standard
-# busybox volume (dir).
+# busybox volume (dir). For now "access" is defined as both read and write.
 # Args: $1=pod-name, $2=PASS|FAIL (expected result)
 # Note: this function should only be called after the target pod as been
 #   verified to be Running.
 function verify_perms() {
 
   local pod="$1"; local pf=$2
-  local out; local expt_pass; local err
+  local out; local expt_pass; local err; local errcnt=0
+
+  # nested function to execute the passed-in command on $pod.
+  # Returns 1 on errors.
+  function pod_exec() {
+    local cmd="$@"; local err
+
+    # exeute $cmd in target pod/container (some trickery...)
+    out="$(ssh $MASTER "
+               ${OC_PREFIX}oc exec $pod -- sh -c 'echo \"\$($cmd 2>&1)\"'
+        ")"
+    # it appears that $? is 0 even with a perms denied error...
+echo "****out=$out"
+    err=0 # assume no error
+    grep -q -E 'Permission denied|No such file' <<<"$out" && err=1 #error!
+    
+    (( err != 0 )) && return 1 # error
+    return 0
+  }
+
+  # main #
 
   # expt_pass=0 --> want pass, expt_pass=1 --> want fail
   [[ "$pf" == 'PASS' ]] && expt_pass=0 || expt_pass=1
 
-  echo "... checking perms to $BB_DIR on pod \"$pod\" ..."
+  echo "... checking perms of $BB_DIR on pod \"$pod\" ..."
 
-  # exeute ls in target pod/container (some trickery...)
-  out="$(ssh $MASTER "
-         ${OC_PREFIX}oc exec $pod -- sh -c 'echo \"\$(ls $BB_DIR 2>&1)\"'
-      ")"
-  # it appears that $? will be 0 even with a perms denied error...
-  err=0 # assume no error
-  grep -q -E 'Permission denied|No such file' <<<"$out" && err=1 #error!
+  # exeute ls in target pod/container
+  err=0
+  pod_exec ls $BB_DIR || err=1
+echo "*** err=$err, expt=$expt_pass"
+  (( err == expt_pass )) || ((errcnt++)) # no read access to bb dir
 
-  (( err == expt_pass )) && return 0 # perms test worked as expected
-  return 1 # didn't get expected results
+  # exeute touch in target pod/container
+  err=0
+  pod_exec touch $BB_DIR/$pod || err=1
+echo "*** err=$err, expt=$expt_pass"
+  (( err == expt_pass )) || ((errcnt++)) # no write access to bb dir
+
+  (( errcnt != 0 )) && return 1 # 1 or more errors
+  return 0
 }
 
 # returns 0 if the passed-in pod is running, has the expected mount, and has
@@ -1111,7 +1135,8 @@ END
   echo "...checking that all OSE-nodes have the /opt/data directory..."
   echo "   (May be prompted for your password on each node)"
   for node in ${OSE_NODES[@]}; do
-    ssh -q $node "mkdir -p /opt/data"
+    # perms test includes write (touch), need all access for "other"
+    ssh -q $node "mkdir -p /opt/data && chmod 777 /opt/data"
   done
 
   cat <<END | ssh $MASTER "${OC_PREFIX}oc create -f -"
