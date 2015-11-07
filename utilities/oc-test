@@ -756,7 +756,6 @@ function verify_perms() {
                ${OC_PREFIX}oc exec $pod -- sh -c 'echo \"\$($cmd 2>&1)\"'
         ")"
     # it appears that $? is 0 even with a perms denied error...
-echo "****out=$out"
     err=0 # assume no error
     grep -q -E 'Permission denied|No such file' <<<"$out" && err=1 #error!
     
@@ -774,13 +773,11 @@ echo "****out=$out"
   # exeute ls in target pod/container
   err=0
   pod_exec ls $BB_DIR || err=1
-echo "*** err=$err, expt=$expt_pass"
   (( err == expt_pass )) || ((errcnt++)) # no read access to bb dir
 
   # exeute touch in target pod/container
   err=0
   pod_exec touch $BB_DIR/$pod || err=1
-echo "*** err=$err, expt=$expt_pass"
   (( err == expt_pass )) || ((errcnt++)) # no write access to bb dir
 
   (( errcnt != 0 )) && return 1 # 1 or more errors
@@ -913,6 +910,50 @@ function verify_new_secret() {
 
   echo -e "ERROR: $(((TRIES*SLEEP))) seconds waiting for secret \"$secret\" to start:\n$out"
   return 1
+}
+
+# returns 1 on errors. Checks that each ose node is setup to run the general
+# tests (mostly the hostPath case). The biggest check here is to ensure that
+# the correct selinux label is on the /opt/data dir on each node.
+# $@=ose-nodes.
+function verify_general_setup() {
+
+  local nodes="$@"
+  local node; local out; local perms; local z; local w
+  local label='svirt_sandbox_file_t'
+
+  echo "...checking that all OSE-nodes are setup for the general tests..."
+  echo "   (May be prompted for your password on each node, possibly"
+  echo "    multiple times)..."
+
+  for node in $nodes; do
+     echo
+     echo "   *** on node: $node..."
+
+     # selinux label set?
+     out="$(ssh $node "ls -Zd /opt/data")"
+     (( $? != 0 )) || [[ -z "$out" ]] && {
+       echo -e "ERROR: cannot get selinux label for /opt/data:\n$out";
+       return 1; }
+     out=($out) # array
+     perms="${out[0]}"; w=${perms:8:1} # other W bit
+     z="${out[3]}" # se output
+     z=(${z//:/ }); z="${z[2]}" # just the label
+
+     # correct label for container access?
+     [[ "$z" == "$label" && "$w" == 'w' ]] && continue # no perms issue, next
+
+     # need to correct perms and/or label -- just do both for simplicity
+     echo "... need to fix up /opt/data..."
+     out="$(ssh $node "(chmod 777 /opt/data && 
+                chcon -R -t $label /opt/data)" 2>&1)"
+     (( $? != 0 )) && {
+       echo -e "ERROR: cannot chmod 777 and chcon $label /opt/data:\n$out";
+       return 1; }
+  done
+
+  echo "...all OSE-nodes are setup for the general tests"
+  return 0
 }
 
 # returns 1 on errors. Checks that nfs-util and rpcbind are installed and
@@ -1089,10 +1130,21 @@ function general_test() {
     These baseline tests test that the SGIDs $USE_SGIDS works in emptyDir
     and in hostPath. No PVs or claims are used here.
 
+    Each ose-node needs to be setup for Write access to the /opt/data dir.
+    Even with 777 perms, the default container selinux labels will prevent 
+    write access. Therefore, /opt/data needs the 'svirt_sandbox_file_t'
+    label added, per node. This is done using:
+      $ chcon -R -t svirt_sandbox_file_t /opt/data
+
 END_GENERAL
 
     read -p "Press any key to continue..." -t120 out
   fi
+
+  # check the general setup on the ose nodes
+  verify_general_setup ${OSE_NODES[@]} || {
+    echo "ERROR: cannot verify that hostPath is setup correctly on all ose-nodes";
+    return 1; }
 
   echo
   echo "----------"
@@ -1154,6 +1206,7 @@ spec:
     volumeMounts:
     - name: bb-vol2
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1268,6 +1321,7 @@ spec:
     volumeMounts:
     - name: nfs-vol1
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
       privileged: false
   volumes:
@@ -1304,6 +1358,7 @@ spec:
     volumeMounts:
     - name: nfs-vol2
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1341,7 +1396,7 @@ spec:
   capacity:
     storage: 1Gi
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   nfs:
     path: $vol_mount
     server: $NFS
@@ -1358,7 +1413,7 @@ metadata:
   name: $pvc
 spec:
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   resources:
      requests:
        storage: 1Gi
@@ -1386,6 +1441,7 @@ spec:
     volumeMounts:
     - name: nfs-vol3
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1535,6 +1591,7 @@ spec:
     volumeMounts:
     - name: gluster-vol1
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
       privileged: false
   volumes:
@@ -1570,6 +1627,7 @@ spec:
     volumeMounts:
     - name: gluster-vol2
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1604,7 +1662,7 @@ spec:
   capacity:
     storage: 1Gi
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   glusterfs:
     endpoints: $endpt
     path: $GLUSTER_VOL
@@ -1622,7 +1680,7 @@ metadata:
   name: $pvc
 spec:
   accessModes:
-  - ReadWriteOnce
+  - ReadWriteMany
   resources:
      requests:
        storage: 1Gi
@@ -1650,6 +1708,7 @@ spec:
     volumeMounts:
     - name: gluster-vol3
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
     supplementalGroups: [$USE_SGIDS]
     privileged: false
@@ -1774,6 +1833,7 @@ spec:
     volumeMounts:
     - name: rbd-vol1
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
     privileged: false
   volumes:
@@ -1865,6 +1925,7 @@ spec:
     volumeMounts:
     - name: rbd-vol2
       mountPath: $BB_DIR
+      readOnly: false
   securityContext:
     fsGroup: $USE_BLK_GID
     privileged: false
