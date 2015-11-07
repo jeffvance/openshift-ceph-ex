@@ -956,8 +956,8 @@ function verify_general_setup() {
   return 0
 }
 
-# returns 1 on errors. Checks that nfs-util and rpcbind are installed and
-# running, and that the correct selinux labels are set on all ose nodes.
+# returns 1 on errors. On each ose-node, Checks that nfs-util and rpcbind are
+# installed, and that the correct selinux labels are set on all ose nodes.
 # $@=ose-nodes.
 function verify_nfs_setup() {
 
@@ -981,11 +981,6 @@ function verify_nfs_setup() {
        echo -e "ERROR: nfs-util and/or rpcbind are not installed:\n$out"
        return 1
      fi
-
-     # running?
-     out="$(ssh $node "systemctl status nfs rpcbind")"
-     (( $? != 0 )) && {
-       echo -e "ERROR: nfs/rpcbind are not running:\n$out"; return 1; }
 
      # selinux nfs related bools set on?
      out="$(ssh $node "getsebool ${bools[@]}")"
@@ -1263,7 +1258,7 @@ function nfs_test() {
     from the openshift-master, "$MASTER", execute:
        $ telnet $NFS 2049  # ctrl-c to exit
     To open port 2049 execute (on the NFS server):
-       $ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPTA
+       $ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT
 
     Also, on the NFS server, edit /etc/exports to include /opt/nfs, eg:
        /opt/nfs *(rw,sync,no_root_squash)
