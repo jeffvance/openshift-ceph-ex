@@ -127,8 +127,7 @@ END
 # $1= a list of 1 or more tests, comma separated.
 function parse_tests() {
 
-  local tests="${1/ceph/rbd}"
-  local test
+  local tests="${1/ceph/rbd}"; local test
 
   tests="${tests//,/ }"
 
@@ -144,11 +143,11 @@ function parse_tests() {
   return 0
 }
 
-# set globals to true for each test passed in.
+# set globals to true for each test passed in. Assumes the tests arg contains
+# only valid test names.
 function set_test_flags() {
 
-  local tests="$@"
-  local test
+  local tests="$@"; local test
 
   for test in $tests; do
      case "$test" in
@@ -265,19 +264,16 @@ function parse_cmd() {
     GENERAL_TEST=0 # false, don't assume general is in the list of tests
     TESTS="$1"; shift
     # handle "all" tests
-    if [[ "$TESTS" == 'all' ]] ; then
-      TESTS="$ALL_TESTS"
-    fi
+    [[ "$TESTS" == 'all' ]] && TESTS="$ALL_TESTS"
   fi
 
   # handle a list of tests
-  TESTS="$(parse_tests "$TESTS")"
+  TESTS=($(parse_tests "$TESTS")) # array
   if (( $? != 0 )) ; then
-    echo "$TESTS" # error msg
+    echo "${TESTS[@]}" # error msg
     return -1
   fi
   set_test_flags $TESTS
-  TESTS=($TESTS)  # array
   NUM_TESTS=${#TESTS[@]}
 
   # --oc-prefix:
