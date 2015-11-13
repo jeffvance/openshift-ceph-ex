@@ -6,10 +6,10 @@ The [oc-test](oc-test) script can be used to verify/validate an OSE environment,
   - [Overview](#overview) and usage
   - [Example 1](#example-1-verify-the-target-ose-environment) - verify OSE env only
   - [Example 2](#example-2-verify-ose-env-using-non-official-origin) - verify OSE env only using custom origin
-  - [Example 3](#example-4-nfs-test-suite) - NFS tests
-  - [Example 4](#example-5-gluster-storage-test-suite) - Gluster tests
-  - [Example 5](#example-6-ceph-rbd-test-suite) - Ceph-RBD tests
-  - [Example 6](#example-7-all-test-suites) - all tests 
+  - [Example 3](#example-3-nfs-test-suite) - NFS tests
+  - [Example 4](#example-4-gluster-storage-test-suite) - Gluster tests
+  - [Example 5](#example-5-ceph-rbd-test-suite) - Ceph-RBD tests
+  - [Example 6](#example-6-all-test-suites) - all tests 
 
 ### Overview
 At the end of the tests all pods, PV, PVCs, endpoints, secrets, etc. that were successfully created remain actively running. This allows the tester to inspect containers, exec into running containers and test file access, verify the container's user's ids, etc. Over time these types of manual container focused tests could be automated.
@@ -162,9 +162,6 @@ However, the script only verifies that *openshift_use_nfs* and *virt_use_nfs* ar
 ```
   ./oc-test --master rhel7-ose-1 --nfs-server f21-nfs  nfs
 
-*** Will run 1 test on ose-master "rhel7-ose-1":
-       nfs
-
 *** Validating ose-master: "rhel7-ose-1"...
 
 Login successful.
@@ -172,25 +169,43 @@ Login successful.
 Using project "default".
 
 You have access to the following projects and can switch between them with 'oc project <projectname>':
+
   * default (current)
   * openshift
   * openshift-infra
+
 ... validated
 
+=============================================
+ OSE master node   : rhel7-ose-1
+ OSE nodes         : rhel7-ose-1
+ Current project   : "default"
+   User IDs        : 12345/10
+   Group IDs       : 5550/10,590/5,1000000000/10000
+   Default SGID    : 5550
+ Additional SGIDs  : 5555,590  (from cmd args)
+ Shared storage pod's GID : 5555,590,5550
+ Blk storage pod's FSGroup: 5550
+=============================================
+
+*** Will run 1 test on ose-master "rhel7-ose-1":
+       nfs
 *** Executing tests ...
+
 
 *** NFS test suite ***
 
-Connecting to f21-nfs via ssh. You may need to enter a password.
+Connecting to NFS server f21-nfs via ssh.
+You may need to enter a password. (possibly more than once)
 
-root@f21-nfs's password: <nfs server password entered>
+root@f21-nfs's password: 
 
     Busybox is run with a volume mounted to the NFS server: f21-nfs.
     Remember to open port 2049 on the NFS server. A good test for this is,
     from the openshift-master, "rhel7-ose-1", execute:
        $ telnet f21-nfs 2049  # ctrl-c to exit
     To open port 2049 execute (on the NFS server):
-       $ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPTA
+       $ iptables -I INPUT 1 -p tcp --dport 2049 -j ACCEPT
 
     Also, on the NFS server, edit /etc/exports to include /opt/nfs, eg:
        /opt/nfs *(rw,sync,no_root_squash)
@@ -198,7 +213,7 @@ root@f21-nfs's password: <nfs server password entered>
     The group ID for the NFS export directory /opt/nfs is:
        5555
     and permissions on this directory are:
-       drwxrwS---.
+       drwxrws---.
 
     To edit the range of supplemental group IDs, on the openshift-master, use:
        $ oc edit ns default
@@ -209,48 +224,64 @@ root@f21-nfs's password: <nfs server password entered>
 
     On the other hand, if it's ok to change the perms on /opt/nfs to match
     openshift's range of groups, then execute (on f21-nfs):
-       $ chgrp 5555 /opt/nfs && chmod g+srw /opt/nfs
+       $ chgrp 5550 /opt/nfs
 
     Note: it may necessary to restart NFS:
        $ systemctl restart rpcbind nfs
 
 Press any key to continue...
+...checking /etc/exports on the NFS server (f21-nfs)...
+root@f21-nfs's password: 
+...checking that all OSE-nodes are setup for the NFS client...
+   (May be prompted for your password on each node, possibly
+    multiple times)...
+
+   *** on node: rhel7-ose-1...
+...all OSE-nodes are setup for the NFS client
 
 ----------
-NFS Test 1: baseline: busybox, nfs plugin:
+NFS Test 1: baseline: busybox, nfs plugin
+  (no supplementalGroups defined for this pod)
+
 ... deleting pod "nfs-pod1" (if it exists)...
 pod "nfs-pod1" created
 ... checking pod "nfs-pod1" ...
 ... checking mount type "nfs" for pod "nfs-pod1" ...
+... checking perms of /usr/share/busybox on pod "nfs-pod1" ...
 
 ----------
-NFS Test 2: busybox, nfs plugin, SGID 5555:
+NFS Test 2: busybox, nfs plugin, SGIDs: 5555,590,5550
+
 ... deleting pod "nfs-pod2" (if it exists)...
 pod "nfs-pod2" created
 ... checking pod "nfs-pod2" ...
 ... checking mount type "nfs" for pod "nfs-pod2" ...
+... checking perms of /usr/share/busybox on pod "nfs-pod2" ...
 
 ----------
-NFS Test 3: busybox, PV, PVC, SGID 5555:
+NFS Test 3: busybox, PV, PVC, SGIDs: 5555,590,5550
+
+... deleting pvc "nfs-pvc" (if it exists)...
 ... deleting pv "nfs-pv" (if it exists)...
 persistentvolume "nfs-pv" created
 ... checking PV "nfs-pv" ...
-... deleting pvc "nfs-pvc" (if it exists)...
 persistentvolumeclaim "nfs-pvc" created
 ... checking PVC "nfs-pvc" ...
 ... deleting pod "nfs-pod3" (if it exists)...
 pod "nfs-pod3" created
 ... checking pod "nfs-pod3" ...
 ... checking mount type "nfs" for pod "nfs-pod3" ...
+... checking perms of /usr/share/busybox on pod "nfs-pod3" ...
 
 ***
 *** Done with tests: 0 errors
 ***
+
 ```
-  Again `-q` suppresses the continue prompt and the bulk of the nfs instructional output. Also `--sgid` can be supplied to set the Group ID in the busybox container, which is useful for various access/permissions issues.
+  Again `-q` suppresses the continue prompt and the bulk of the nfs instructional output. Also `--sgid` can be supplied to set the supplemental Group IDs in the busybox container, which may be necessary to allow the container to read and/or write to the nfs mount.
 
 
-### Example 5: Gluster storage test suite
+### Example 4: Gluster storage test suite
 This example runs the gluster tests against an existing gluster cluster and volume. The gluster setup on all OSE worker nodes is checked to ensure that gluster has been installed, and that the correct selinux booleans are set ON. The required SE booleans are:
   - virt_sandbox_use_fusefs --> on
   - virt_sandbox_use_fusefs --> on
