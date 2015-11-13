@@ -27,9 +27,12 @@ BB_DIR='/usr/share/busybox'
 NFS_MOUNT='/opt/nfs'
 
 # test vars
-ALL_TESTS='general,nfs,gluster,rbd'
-TESTS='general' # default
-GENERAL_TEST=1 # true, default
+##ALL_TESTS='general,nfs,gluster,rbd' ##don't support general tests for now...
+ALL_TESTS='nfs,gluster,rbd'
+TESTS=''
+##TESTS='general' # default ## there is no default test now...
+##GENERAL_TEST=1 # true, default ## don't support general test for now...
+##GENERAL_TEST=0 # false
 GLUSTER_TEST=0 # false
 NFS_TEST=0     # false
 RBD_TEST=0     # false
@@ -40,6 +43,7 @@ RBD_TEST=0     # false
 function usage() {
 
   cat <<END
+
   oc-test - execute one or more ose storage tests
 
 SYNTAX
@@ -157,9 +161,9 @@ function set_test_flags() {
 
   for test in $tests; do
      case "$test" in
-        general)
-          GENERAL_TEST=1 # true
-        ;;
+        #general)  ## don't support general tests for now...
+          #GENERAL_TEST=1 # true
+        #;;
         gluster)
           GLUSTER_TEST=1
         ;;
@@ -182,8 +186,6 @@ function parse_cmd() {
   local errcnt=0
   local opts='q'
   local long_opts='version,master:,verify,oc-prefix:,nfs-server:,gluster-nodes:,gluster-vol:,sgids:,block-gid:,rbd-monitors:,ceph-secret64:,rbd-image:'
-
-  (( $# == 0 )) && usage && exit -1
 
   eval set -- "$(getopt -o "$opts" --long $long_opts -- $@)"
 
@@ -260,18 +262,20 @@ function parse_cmd() {
       esac
   done
 
-  if (( $# > 1 )) ; then
-    shift
-    echo "Syntax error: unexpected command line arg: $@"
-    return 1
-  fi
+  # remaining arg should be a test name(s)
+  (( $# == 0 )) && {
+    echo "Syntax error: expected a list of 1 or more test names";
+    usage;
+    return -1; }
+  (( $# > 1 )) && {
+    shift;
+    echo "Syntax error: unexpected command line arg: $@";
+    usage;
+    return -1; }
 
-  if (( $# == 1 )) ; then # test arg is optional; default is general tests
-    GENERAL_TEST=0 # false, don't assume general is in the list of tests
-    TESTS="$1"; shift
-    # handle "all" tests
-    [[ "$TESTS" == 'all' ]] && TESTS="$ALL_TESTS"
-  fi
+  TESTS="$1"; shift
+  # handle "all" tests
+  [[ "$TESTS" == 'all' ]] && TESTS="$ALL_TESTS"
 
   # handle a list of tests
   TESTS=($(parse_tests "$TESTS")) # array
@@ -534,16 +538,18 @@ function validate_ose_env() {
                      cut -d' ' -f1)) # not scheduable
   OSE_NODES=($(grep Ready <<<"$out" | cut -d' ' -f1)) # only scheduable nodes
 
+  # NOTE: this HostDir test only applies to the general tests which are no
+  #   longer supported.
   # oc get scc
-  out="$(ssh $MASTER "${OC_PREFIX}oc get scc")"
-  if awk '{print $4}' <<<"$out" | grep -q false ; then #HOSTDIR col has a false
-    echo "ERROR: HOSTDIR is false:"
-    echo "$out"
-    echo
-    echo "Use the \"oc edit scc {privileged|restricted}\" command and set"
-    echo "'allowHostDirVolumePlugin' to true."
-    return 1
-  fi
+  #out="$(ssh $MASTER "${OC_PREFIX}oc get scc")"
+  #if awk '{print $4}' <<<"$out" | grep -q false ; then #HOSTDIR col has a false
+    #echo "ERROR: HOSTDIR is false:"
+    #echo "$out"
+    #echo
+    #echo "Use the \"oc edit scc {privileged|restricted}\" command and set"
+    #echo "'allowHostDirVolumePlugin' to true."
+    #return 1
+  #fi
 
   echo "... validated"
   echo
@@ -1133,6 +1139,7 @@ function handle_gid_string() {
 }
 
 # run the "general" tests.
+## NOTE: not currently supported.
 function general_test() {
 
   local pod; local node
@@ -1966,8 +1973,8 @@ function execute_tests() {
   echo
 
   # execute each requested test:
-  (( GENERAL_TEST )) && {
-    general_test || ((errcnt++)); }
+  ##(( GENERAL_TEST )) && {  # don't support general tests for now...
+    ##general_test || ((errcnt++)); }
 
   (( GLUSTER_TEST )) && {
     gluster_test || ((errcnt++)); }
