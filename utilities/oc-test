@@ -261,11 +261,10 @@ function parse_cmd() {
       esac
   done
 
+  # no arg means just show usage
+  (( $# == 0 )) && { usage; return -1; }
+
   # remaining arg should be a test name(s)
-  (( $# == 0 )) && {
-    echo "Syntax error: expected a list of 1 or more test names";
-    usage;
-    return -1; }
   (( $# > 1 )) && {
     shift;
     echo "Syntax error: unexpected command line arg: $@";
