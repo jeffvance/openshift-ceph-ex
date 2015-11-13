@@ -54,7 +54,6 @@ DESCRIPTION
   storage tests on the ose-master server.
 
   test-name  A list of one or more tests to run. Expected values are:
-               general (default),
                nfs,
                gluster,
                rbd (or ceph),
