@@ -17,11 +17,15 @@
 # See usage() for syntax.
 #
 
-VERSION=0.92
+VERSION=0.94
 VERIFY_ONLY=0 # false
 MASTER="$HOSTNAME"
 OC_PREFIX=''
 BB_DIR='/usr/share/busybox'
+
+# nfs vars
+NFS_MOUNT='/opt/nfs'
+
 # test vars
 ALL_TESTS='general,nfs,gluster,rbd'
 TESTS='general' # default
@@ -115,7 +119,9 @@ DESCRIPTION
                <pool-name>/<image-name>
              Ignored for all tests other than the ceph-rbd tests.
   --version  Show the version string.
-  -q         Suppress all prompts and reduce instructional output.
+  -q         Suppress "continue?" prompts, skip test environment setup check on
+             each ose-node (which also eliminates password prompts on those
+             nodes), and reduce instructional output.
 
 END
 
@@ -952,8 +958,11 @@ function verify_general_setup() {
   return 0
 }
 
-# returns 1 on errors. On each ose-node, Checks that nfs-util and rpcbind are
-# installed, and that the correct selinux labels are set on all ose nodes.
+# returns 1 on errors. On each ose-node checks that nfs-util and rpcbind are
+# installed, that the correct selinux labels are set, and that port 2049 on 
+# the NFS server is reachable.
+# On the NFs server /etc/exports is checked to make sure that the NFS mount is
+# present.
 # $@=ose-nodes.
 function verify_nfs_setup() {
 
@@ -961,6 +970,12 @@ function verify_nfs_setup() {
   local node; local out; local cnt
   local bools=(openshift_use_nfs virt_use_nfs) # array
   local bools_cnt=${#bools[@]}
+
+  echo "...checking /etc/exports on the NFS server ($NFS)..."
+  if ! ssh $NFS "grep -q ^$NFS_MOUNT /etc/exports" ; then
+    echo "ERROR: \"$NFS_MOUNT\" missing in /etc/exports"
+    return 1
+  fi 
 
   echo "...checking that all OSE-nodes are setup for the NFS client..."
   echo "   (May be prompted for your password on each node, possibly"
@@ -987,6 +1002,14 @@ function verify_nfs_setup() {
      if (( cnt != bools_cnt )) ; then
        echo -e "ERROR: only $cnt selinux bools are ON, expected $bools_cnt:\n$out"
        echo "         $ setsebool -P <bool-name> 1  #sets these bools"
+       return 1
+     fi
+
+     # port 2049 reachable?
+     out="$(ssh $node "which telnet 2>&1 && telnet $NFS 2049 <<<quit 2>&1")"
+     # note $? seems to always be 1...
+     if [[ -n "$out" ]] && grep -q "No route to host" <<<"$out" ; then
+       echo -e "ERROR: cannot telnet to port 2049:\n$out"
        return 1
      fi
   done
@@ -1130,12 +1153,12 @@ function general_test() {
 END_GENERAL
 
     read -p "Press any key to continue..." -t120 out
-  fi
 
-  # check the general setup on the ose nodes
-  verify_general_setup ${OSE_NODES[@]} || {
-    echo "ERROR: cannot verify that hostPath is setup correctly on all ose-nodes";
-    return 1; }
+    # check the general setup on the ose nodes
+    verify_general_setup ${OSE_NODES[@]} || {
+      echo "ERROR: cannot verify hostPath is setup correctly on all ose-nodes";
+      return 1; }
+  fi
 
   echo
   echo "----------"
@@ -1217,36 +1240,36 @@ END
 function nfs_test() {
 
   local pod; local pv; local pvc; local out; local ssh_ok
-  local vol_mount='/opt/nfs'; local vol_perms; local vol_gid
+  local vol_perms; local vol_gid
 
   echo
   echo "*** NFS test suite ***"
   echo
 
-  # get nfs vol mount perms from nfs server
-  echo "Connecting to NFS server $NFS via ssh."
-  echo "You may need to enter a password."
-  sleep 1
-  echo
-
-  out="$(ssh $NFS "ls -ld $vol_mount 2>&1")"
-  if (( $? == 0 )) ; then
-    out=($out) # array
-    vol_perms="${out[0]}"
-    vol_gid="${out[3]}"
-    # convert string gid value (if it's a string) to numeric
-    vol_gid="$(handle_gid_string $vol_gid $NFS)"
-    (( $? != 0 )) && { echo "$vol_gid"; vol_gid=''; }
-  else
-    echo "WARN: cannot retrieve permissions on $vol_mount from NFS server"
-    echo "  \"$NFS\" via ssh. Be aware of potential permission mismatches"
-    echo "  between openshift supplemental groups and the NFS mount directory"
-    echo
-    echo "$out"
-  fi
-
   # show more info about running these tests...
   if (( ! QUIET )) ; then
+    # get nfs vol mount perms from nfs server
+    echo "Connecting to NFS server $NFS via ssh."
+    echo "You may need to enter a password. (possibly more than once)"
+    sleep 1
+    echo
+
+    out="$(ssh $NFS "ls -ld $NFS_MOUNT 2>&1")"
+    if (( $? == 0 )) ; then
+      out=($out) # array
+      vol_perms="${out[0]}"
+      vol_gid="${out[3]}"
+      # convert string gid value (if it's a string) to numeric
+      vol_gid="$(handle_gid_string $vol_gid $NFS)"
+      (( $? != 0 )) && { echo "$vol_gid"; vol_gid=''; }
+    else
+      echo "WARN: cannot retrieve permissions on $NFS_MOUNT from NFS server"
+      echo "  \"$NFS\" via ssh. Be aware of potential permission mismatches"
+      echo "  between openshift supplemental groups and the NFS mount directory"
+      echo
+      echo "$out"
+    fi
+
     cat <<END_NFS
 
     Busybox is run with a volume mounted to the NFS server: $NFS.
@@ -1259,7 +1282,7 @@ function nfs_test() {
     Also, on the NFS server, edit /etc/exports to include /opt/nfs, eg:
        /opt/nfs *(rw,sync,no_root_squash)
 
-    The group ID for the NFS export directory $vol_mount is:
+    The group ID for the NFS export directory $NFS_MOUNT is:
        ${vol_gid:-<unavailable>}
     and permissions on this directory are:
        ${vol_perms:-<unavailable>}
@@ -1267,11 +1290,11 @@ function nfs_test() {
     To edit the range of supplemental group IDs, on the openshift-master, use:
        $ oc edit ns $NS
     and change the 'openshift.io/sa.scc.supplemental-groups' range to
-    include the NFS group ID for $vol_mount.  Also, use:
+    include the NFS group ID for $NFS_MOUNT.  Also, use:
        $ oc get ns $NS -o yaml
     to see the values for various IDs in the "$NS" project.
 
-    On the other hand, if it's ok to change the perms on $vol_mount to match
+    On the other hand, if it's ok to change the perms on $NFS_MOUNT to match
     openshift's range of groups, then execute (on $NFS):
        $ chgrp $OS_SGID /opt/nfs
 
@@ -1281,12 +1304,12 @@ function nfs_test() {
 END_NFS
 
     read -p "Press any key to continue..." -t120 out
-  fi
 
-  # check the nfs setup on the ose nodes
-  verify_nfs_setup ${OSE_NODES[@]} || {
-    echo "ERROR: cannot verify that NFS is setup correctly on all ose-nodes";
-    return 1; }
+    # check the nfs setup on the ose nodes
+    verify_nfs_setup ${OSE_NODES[@]} || {
+      echo "ERROR: cannot verify that NFS is setup correctly on all ose-nodes";
+      return 1; }
+  fi
 
   echo
   echo "----------"
@@ -1318,7 +1341,7 @@ spec:
   volumes:
   - name: nfs-vol1
     nfs:
-      path: "$vol_mount"
+      path: "$NFS_MOUNT"
       server: $NFS
       readOnly: false
 END
@@ -1356,7 +1379,7 @@ spec:
   volumes:
   - name: nfs-vol2
     nfs:
-      path: "$vol_mount"
+      path: "$NFS_MOUNT"
       server: $NFS
       readOnly: false
 END
@@ -1389,7 +1412,7 @@ spec:
   accessModes:
   - ReadWriteMany
   nfs:
-    path: $vol_mount
+    path: $NFS_MOUNT
     server: $NFS
 END
 
@@ -1459,35 +1482,35 @@ function gluster_test() {
   echo "*** Gluster test suite ***"
   echo
 
-  # get gluster vol mount perms
-  node="${GLUSTER_NODES[0]}"
-  echo "Connecting to $node via ssh. You may need to enter a password."
-  sleep 1
-  echo
-  out="$(ssh $node "
-          ( mnt=\$(mount |
+  # show more info about running these tests...
+  if (( ! QUIET )) ; then
+    # get gluster vol mount perms
+    node="${GLUSTER_NODES[0]}"
+    echo "Connecting to $node via ssh. You may need to enter a password."
+    sleep 1
+    echo
+    out="$(ssh $node "
+            ( mnt=\$(mount |
                    grep 'fuse.glusterfs' |
                    grep $GLUSTER_VOL |
                    awk '{print \$3}') # set remote mnt var
-            ls -ld \$mnt ) 2>&1
-         ")"
-  if (( $? == 0 )) ; then
-    out=($out) # array
-    mnt_perms="${out[0]}"
-    mnt_gid="${out[3]}"
-    # convert string gid value (if it's a string) to numeric
-    mnt_gid="$(handle_gid_string $mnt_gid $node)"
-    (( $? != 0 )) && { echo "$mnt_gid"; vol_gid=''; }
-  else
-    echo "WARN: cannot retrieve permissions for \"$GLUSTER_VOL\" from gluster"
-    echo "  node $node via ssh. Be aware of potential permission mismatches"
-    echo "  between openshift supplemental groups and the gluster mount."
-    echo
-    echo "$out"
-  fi
+              ls -ld \$mnt ) 2>&1
+           ")"
+    if (( $? == 0 )) ; then
+      out=($out) # array
+      mnt_perms="${out[0]}"
+      mnt_gid="${out[3]}"
+      # convert string gid value (if it's a string) to numeric
+      mnt_gid="$(handle_gid_string $mnt_gid $node)"
+      (( $? != 0 )) && { echo "$mnt_gid"; vol_gid=''; }
+    else
+      echo "WARN: cannot retrieve permissions for \"$GLUSTER_VOL\" from gluster"
+      echo "  node $node via ssh. Be aware of potential permission mismatches"
+      echo "  between openshift supplemental groups and the gluster mount."
+      echo
+      echo "$out"
+    fi
 
-  # show more info about running these tests...
-  if (( ! QUIET )) ; then
     cat <<END_GLUSTER
 
     The supplied gluster storage nodes (endpoints) and the glusterfs plugin
@@ -1526,12 +1549,12 @@ function gluster_test() {
 END_GLUSTER
   
     read -p "Press any key to continue..." -t120 out
-  fi
 
-  # check the gluster setup on the ose nodes
-  verify_gluster_setup ${OSE_NODES[@]} || {
-    echo "ERROR: cannot verify that gluster is setup correctly on all ose-nodes";
-    return 1; }
+    # check the gluster setup on the ose nodes
+    verify_gluster_setup ${OSE_NODES[@]} || {
+      echo "ERROR: cannot verify gluster is setup correctly on all ose-nodes";
+      return 1; }
+  fi
 
   echo
   echo "----------"
@@ -1772,12 +1795,12 @@ function rbd_test() {
 END_RBD
   
     read -p "Press any key to continue..." -t120 out
-  fi
 
-  # check the ceph setup on the ose nodes
-  verify_ceph_setup ${OSE_NODES[@]} || {
-    echo "ERROR: cannot verify that ceph is setup correctly on all ose-nodes";
-    return 1; }
+    # check the ceph setup on the ose nodes
+    verify_ceph_setup ${OSE_NODES[@]} || {
+      echo "ERROR: cannot verify ceph is setup correctly on all ose-nodes";
+      return 1; }
+  fi
 
   echo
   echo "----------"
