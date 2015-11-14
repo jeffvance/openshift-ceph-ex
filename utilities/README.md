@@ -276,9 +276,17 @@ pod "nfs-pod3" created
 ***
 *** Done with tests: 0 errors
 ***
-
 ```
-  Again `-q` suppresses the continue prompt and the bulk of the nfs instructional output. Also `--sgid` can be supplied to set the supplemental Group IDs in the busybox container, which may be necessary to allow the container to read and/or write to the nfs mount.
+Again `-q` suppresses the continue prompt and the bulk of the nfs instructional output. Also `--sgid` can be supplied to set the supplemental Group IDs in the busybox container, which may be necessary to allow the container to read and/or write to the nfs mount.
+  
+Here are the newly created pods:
+```
+  # oc get po
+NAME       READY     STATUS    RESTARTS   AGE
+nfs-pod1   1/1       Running   0          14m
+nfs-pod2   1/1       Running   0          14m
+nfs-pod3   1/1       Running   0          14m
+```
 
 
 ### Example 4: Gluster storage test suite
@@ -288,90 +296,10 @@ This example runs the gluster tests against an existing gluster cluster and volu
 ```
   ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm gluster
 
-*** Will run 1 test on ose-master "rhel7-ose-1":
-       gluster
 
-*** Validating ose-master: "rhel7-ose-1"...
-
-Login successful.
-
-Using project "default".
-
-You have access to the following projects and can switch between them with 'oc project <projectname>':
-
-  * default (current)
-  * openshift
-  * openshift-infra
-
-... validated
-
-===================================
- Master node     : rhel7-ose-1
- Current project : default
-   Sup User IDs  : 12345/10
-   Sup Group IDs : 5555-5555,1000000000/10000
- Supplied Sup GID: <none>
- Pod's Group ID  : 5555
-===================================
-
-*** Executing tests ...
-
-*** Gluster test suite ***
-
-    The supplied gluster storage nodes (endpoints) and the glusterfs plugin
-    are tested using the busybox container to access the HadoopVol volume.
-    On one of the gluster nodes, eg. 192.168.122.21, ensure that gluster
-    is running, that the "HadoopVol" volume is active, and that the volume
-    mount exists. Eg:
-       $ gluster peer status
-       $ gluster volume status HadoopVol
-       $ mount | grep glusterfs
-       # if HadoopVol is not displayed, then:
-       $ mount -a # assuming the vol mount is present in /etc/fstab
-       # if the vol mount is not in /etc/fstab, then add it, eg:
-       192.168.122.21:/HadoopVol /mnt/glusterfs/HadoopVol glusterfs _netdev 0 0
-       # and make sure the bricks are mounted as well...
-
-    On the ose nodes make sure to install the gluster-client.
-
-Press any key to continue...
-
-----------
-Gluster Test 1: baseline: busybox, glusterfs plugin:
-... deleting endpoint "gluster-endpoints" (if it exists)...
-endpoints "gluster-endpoints" created
-... checking endpoint "gluster-endpoints" ...
-... deleting pod "gluster-pod1" (if it exists)...
-pod "gluster-pod1" created
-... checking pod "gluster-pod1" ...
-... checking mount type "glusterfs" for pod "gluster-pod1" ...
-
-----------
-Gluster Test 2: busybox, glusterfs plugin, SGID 5555:
-... deleting pod "gluster-pod2" (if it exists)...
-pod "gluster-pod2" created
-... checking pod "gluster-pod2" ...
-... checking mount type "glusterfs" for pod "gluster-pod2" ...
-
-----------
-Gluster Test 3: busybox, PV, PVC, SGID 5555:
-... deleting pv "gluster-pv" (if it exists)...
-persistentvolume "gluster-pv" created
-... checking PV "gluster-pv" ...
-... deleting pvc "gluster-pvc" (if it exists)...
-persistentvolumeclaim "gluster-pvc" created
-... checking PVC "gluster-pvc" ...
-... deleting pod "gluster-pod3" (if it exists)...
-pod "gluster-pod3" created
-... checking pod "gluster-pod3" ...
-... checking mount type "glusterfs" for pod "gluster-pod3" ...
-
-***
-*** Done with tests: 0 errors
-***
 ```
 
-### Example 6: Ceph-RBD test suite
+### Example 5: Ceph-RBD test suite
 This example runs the ceph-rbd tests against an existing Ceph cluster, which is defined by a single monitor and an existing rbd image. In this case the ceph secret is generated from the monitor, but the ```--ceph-secret64``` option can be specified if there is no ssh access to the monitor.
 ```
    ./oc-test --master rhel7-ose-1 --rbd-monitors 192.168.122.133 --rbd-image ceph-image rbd
