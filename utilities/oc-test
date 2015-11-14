@@ -186,6 +186,9 @@ function parse_cmd() {
   local opts='q'
   local long_opts='version,master:,verify,oc-prefix:,nfs-server:,gluster-nodes:,gluster-vol:,sgids:,block-gid:,rbd-monitors:,ceph-secret64:,rbd-image:'
 
+  # no args means just show usage
+  (( $# == 0 )) && { usage; exit 0; }
+
   eval set -- "$(getopt -o "$opts" --long $long_opts -- $@)"
 
   while true; do
@@ -261,14 +264,31 @@ function parse_cmd() {
       esac
   done
 
-  # no arg means just show usage
-  (( $# == 0 )) && { usage; return -1; }
-
-  # remaining arg should be a test name(s)
+  # remaining arg should be a test name(s) (unless --verify)
   (( $# > 1 )) && {
     shift;
-    echo "Syntax error: unexpected command line arg: $@";
     usage;
+    echo "Syntax error: unexpected command line arg: $@";
+    return -1; }
+
+  # --oc-prefix:
+  if [[ -n "$OC_PREFIX" ]] ; then
+    # oc prefix must end in a '/'
+    [[ "$OC_PREFIX" != */ ]] && OC_PREFIX="$OC_PREFIX/"
+    # make sure oc prefix exists as a dir on the master node
+    if ! ssh $MASTER "[[ -d $OC_PREFIX ]]" ; then
+      echo "ERROR: no directory named \"$OC_PREFIX\" on master node ($MASTER)"
+      return 1
+    fi
+  fi
+
+  # return if --verify
+  (( VERIFY_ONLY )) && return 0 # test name(s) not expected and ignored
+
+  # make sure a test name was requested
+  (( $# == 0 )) && {
+    usage;
+    echo "Syntax error: expected a list of one or more test names";
     return -1; }
 
   TESTS="$1"; shift
@@ -283,17 +303,6 @@ function parse_cmd() {
   fi
   set_test_flags $TESTS
   NUM_TESTS=${#TESTS[@]}
-
-  # --oc-prefix:
-  if [[ -n "$OC_PREFIX" ]] ; then
-    # oc prefix must end in a '/'
-    [[ "$OC_PREFIX" != */ ]] && OC_PREFIX="$OC_PREFIX/"
-    # make sure oc prefix exists as a dir on the master node
-    if ! ssh $MASTER "[[ -d $OC_PREFIX ]]" ; then
-      echo "ERROR: no directory named \"$OC_PREFIX\" on master node ($MASTER)"
-      return 1
-    fi
-  fi
 
   # --sgids: can be a list
   # nothing needed here, just leave it as a string with commas
@@ -1536,7 +1545,7 @@ function gluster_test() {
     and permissions on this volume's mount directory are:
        ${mnt_perms:-<unavailable>}
 
-    To edit the range of supplemental group IDs, on \"$MASTER\", use:
+    To edit the range of supplemental group IDs, on "$MASTER", use:
        $ oc edit ns $NS
     and change the 'openshift.io/sa.scc.supplemental-groups' range to
     include the ${GLUSTER_VOL}'s mount's group ID.  Also, use:
