@@ -425,9 +425,9 @@ gluster-pod3   1/1       Running   0          4m
 
 
 ### Example 5: Ceph-RBD test suite
-This example runs the ceph-rbd tests against an existing Ceph cluster, which is defined by a single monitor and an existing rbd image. In this case the ceph secret is generated from the monitor, but the ```--ceph-secret64``` option can be specified if there is no ssh access to the monitor.
+This example runs the ceph-rbd tests against an existing Ceph cluster, which is defined by a single monitor and an existing rbd image. In this example, the ceph secret is automatically generated from the monitor, but the ```--ceph-secret64``` option can be specified if there is no ssh access to the monitor. Also note the `--block-gid` option, which defines the *FSGroupID* used by the block storage plugins when they "takeover" block storage volumes.
 ```
-   ./oc-test --master rhel7-ose-1 --rbd-monitors 192.168.122.133 --rbd-image ceph-image rbd
+./oc-test --master rhel7-ose-1 --rbd-monitors 192.168.122.133 --rbd-image ceph-image rbd
 *** Will run 1 test on ose-master "rhel7-ose-1":
        rbd
 
