@@ -281,7 +281,7 @@ Again `-q` suppresses the continue prompt and the bulk of the nfs instructional 
   
 Here are the newly created pods:
 ```
-  # oc get po
+$ oc get pods
 NAME       READY     STATUS    RESTARTS   AGE
 nfs-pod1   1/1       Running   0          14m
 nfs-pod2   1/1       Running   0          14m
@@ -296,8 +296,133 @@ This example runs the gluster tests against an existing gluster cluster and volu
 ```
   ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm gluster
 
+*** Validating ose-master: "rhel7-ose-1"...
 
+Login successful.
+
+Using project "default".
+
+You have access to the following projects and can switch between them with 'oc project <projectname>':
+
+  * default (current)
+  * openshift
+  * openshift-infra
+
+... validated
+
+=============================================
+ OSE master node   : rhel7-ose-1
+ OSE nodes         : rhel7-ose-1
+ Current project   : "default"
+   User IDs        : 12345/10
+   Group IDs       : 5550/10,590/5,1000000000/10000
+   Default SGID    : 5550
+ Additional SGIDs  : 5555,590  (from cmd args)
+ Shared storage pod's GID : 5555,590,5550
+ Blk storage pod's FSGroup: 5550
+=============================================
+
+*** Will run 1 test on ose-master "rhel7-ose-1":
+       gluster
+*** Executing tests ...
+
+
+*** Gluster test suite ***
+
+Connecting to 192.168.122.21 via ssh. You may need to enter a password.
+
+
+    The supplied gluster storage nodes (endpoints) and the glusterfs plugin
+    are tested using the busybox container to access the HadoopVol volume.
+    On one of the gluster nodes, eg. 192.168.122.21, ensure that gluster is
+    running, the "HadoopVol" volume is active, and the volume mount 
+    has the correct permissions. Eg:
+       $ gluster peer status
+       $ gluster volume status HadoopVol
+       $ mount | grep glusterfs
+       # if HadoopVol is not displayed, then:
+       $ mount -a # assuming the vol mount is present in /etc/fstab
+       # if the vol mount is not in /etc/fstab, then add it, eg:
+       192.168.122.21:/HadoopVol /mnt/glusterfs/HadoopVol glusterfs _netdev 0 0
+       
+    The group ID for the "HadoopVol" volume mount is:
+       590
+    and permissions on this volume's mount directory are:
+       drwxrwx---
+
+    To edit the range of supplemental group IDs, on "rhel7-ose-1", use:
+       $ oc edit ns default
+    and change the 'openshift.io/sa.scc.supplemental-groups' range to
+    include the HadoopVol's mount's group ID.  Also, use:
+       $ oc get ns default -o yaml
+    to see the values for various IDs in the "default" project.
+
+    On all of the OSE nodes make sure to:
+      $ yum install glusterfs-client
+      $ setsebool -P virt_sandbox_use_fusefs 1  # on, add the fusefs label
+      $ setenforce 1 # keep selinux enforcing
+
+    **NOTE: the setsebool command above. It is critical for enabling POSIX
+            file access from the target containers!!
+
+Press any key to continue...
+...checking that all OSE-nodes are setup for the gluster client...
+   (May be prompted for your password on each node, possibly
+    multiple times)...
+
+   *** on node: rhel7-ose-1...
+...all OSE-nodes are setup for the gluster client
+
+----------
+Gluster Test 1: baseline: busybox, glusterfs plugin
+  (no supplementalGroups defined for this pod)
+
+... deleting endpoint "gluster-endpoints" (if it exists)...
+endpoints "gluster-endpoints" created
+... checking endpoint "gluster-endpoints" ...
+... deleting pod "gluster-pod1" (if it exists)...
+pod "gluster-pod1" created
+... checking pod "gluster-pod1" ...
+... checking mount type "glusterfs" for pod "gluster-pod1" ...
+... checking perms of /usr/share/busybox on pod "gluster-pod1" ...
+
+----------
+Gluster Test 2: busybox, glusterfs plugin, SGIDs: 5555,590,5550
+
+... deleting pod "gluster-pod2" (if it exists)...
+pod "gluster-pod2" created
+... checking pod "gluster-pod2" ...
+... checking mount type "glusterfs" for pod "gluster-pod2" ...
+... checking perms of /usr/share/busybox on pod "gluster-pod2" ...
+
+----------
+Gluster Test 3: busybox, PV, PVC, SGIDs: 5555,590,5550
+
+... deleting pvc "gluster-pvc" (if it exists)...
+... deleting pv "gluster-pv" (if it exists)...
+persistentvolume "gluster-pv" created
+... checking PV "gluster-pv" ...
+persistentvolumeclaim "gluster-pvc" created
+... checking PVC "gluster-pvc" ...
+... deleting pod "gluster-pod3" (if it exists)...
+pod "gluster-pod3" created
+... checking pod "gluster-pod3" ...
+... checking mount type "glusterfs" for pod "gluster-pod3" ...
+... checking perms of /usr/share/busybox on pod "gluster-pod3" ...
+
+***
+*** Done with tests: 0 errors
+***
 ```
+And the resulting pods:
+```
+$ oc get pods
+NAME           READY     STATUS    RESTARTS   AGE
+gluster-pod1   1/1       Running   0          4m
+gluster-pod2   1/1       Running   0          4m
+gluster-pod3   1/1       Running   0          4m
+```
+
 
 ### Example 5: Ceph-RBD test suite
 This example runs the ceph-rbd tests against an existing Ceph cluster, which is defined by a single monitor and an existing rbd image. In this case the ceph secret is generated from the monitor, but the ```--ceph-secret64``` option can be specified if there is no ssh access to the monitor.
@@ -385,7 +510,7 @@ pod "rbd-pod2" created
 ***
 ```
 
-### Example 7: ALL test suites
+### Example 6: ALL test suites
 All tests in a single *oc-test* invocation and somewhat quietly.
 ```
    ./oc-test --master rhel7-ose-1 --gluster-vol=HadoopVol --gluster-nodes=rhs-1.vm,rhs-2.vm --nfs-server=f21-nfs  --rbd-monitors 192.168.122.133 --rbd-image ceph-image  all -q
