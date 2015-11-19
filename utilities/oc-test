@@ -758,43 +758,54 @@ function verify_mount() {
 function verify_perms() {
 
   local pod="$1"; local pf=$2
-  local out; local expt_pass; local err
+  local out; local err; local file # name used for write tests
+  # expt_pass=0 --> want pass, expt_pass=1 --> want fail
+  local expt_pass=0 # assume test is expected to pass
+  local err_verb='denied' # again, assume test is expected to pass
 
   # nested function to execute the passed-in command on $pod.
   # Returns 1 on errors.
   function pod_exec() {
-    local cmd="$@"; local err
+    local cmd="$@"
 
     # exeute $cmd in target pod/container (some trickery...)
     out="$(ssh $MASTER "
                ${OC_PREFIX}oc exec $pod -- sh -c 'echo \"\$($cmd 2>&1)\"'
         ")"
     # it appears that $? is 0 even with a perms denied error...
-    err=0 # assume no error
-    grep -q -E 'Permission denied|No such file' <<<"$out" && err=1 #error!
+    if [[ -n "$out" ]] && 
+       grep -q -E 'Permission denied|No such file' <<<"$out" ; then
+      return 1
+    fi
     
-    (( err != 0 )) && return 1 # error
     return 0
   }
 
   # main #
 
-  # expt_pass=0 --> want pass, expt_pass=1 --> want fail
-  [[ "$pf" == 'PASS' ]] && expt_pass=0 || expt_pass=1
+  [[ "$pf" != 'PASS' ]] && {
+    expt_pass=1; err_verb='allowed'; } # test is expected to fail
 
-  echo "... checking perms of $BB_DIR on pod \"$pod\" ..."
+  echo "... checking perms of $BB_DIR on pod \"$pod\". Expect $pf ..."
 
   # exeute ls in target pod/container
   err=0
   pod_exec ls $BB_DIR || err=1
   (( err == expt_pass )) || {
-    echo "ERROR: READ access denied"; return 1; }
+    echo "ERROR: READ access $err_verb"; return 1; }
 
   # exeute touch in target pod/container
   err=0
-  pod_exec touch $BB_DIR/$pod || err=1
+  file="$BB_DIR/$pod-$(date '+%Y_%m_%d:%H_%M_%s')" # append pod-date:time
+  pod_exec touch $file || err=1
   (( err == expt_pass )) || {
-    echo "ERROR: WRITE access denied"; return 1; }
+    echo "ERROR: WRITE(touch) access $err_verb"; return 1; }
+
+  # rm the file
+  err=0
+  pod_exec rm $file || err=1
+  (( err == expt_pass )) || {
+    echo "ERROR: WRITE(rm) access $err_verb"; return 1; }
 
   return 0
 }
