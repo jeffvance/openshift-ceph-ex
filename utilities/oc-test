@@ -350,6 +350,15 @@ function parse_cmd() {
   return 0
 }
 
+# output the unique nodes from the list of nodes provided.
+# $@=list of nodes.
+function uniq_nodes() {
+
+  local nodes=($@)
+ 
+  printf '%s\n' "${nodes[@]}" | sort -u
+}
+
 # returns true (0) if at least one of the passed-in ids are within (inclusive)
 # any of the pased-in range(s).
 #   arg1=test-ids, arg2=range(s).
@@ -518,11 +527,11 @@ function get_current_namespace() {
 }
 
 # validate openshift env on passed-in node. Return 1 on error. Sets the global
-# array OSE_NODES to include all ready/scheduable nodes. Outputs features of
-# the current ose environment.
+# array OSE_NODES to include all ready/scheduable nodes. Echos a summary of the
+# current ose environment.
 function validate_ose_env() {
 
-  local out; local not_ready_nodes
+  local out; local not_ready_nodes; local node
 
   echo "*** Validating ose-master: \"$MASTER\"..."
   echo
@@ -543,6 +552,21 @@ function validate_ose_env() {
   not_ready_nodes=($(grep -v Ready <<<"$out" |
                      cut -d' ' -f1)) # not scheduable
   OSE_NODES=($(grep Ready <<<"$out" | cut -d' ' -f1)) # only scheduable nodes
+
+  # verify docker and docker-selinux are installed on all ose nodes (and master)
+  for node in $(uniq_nodes ${OSE_NODES[@]} $MASTER); do
+    out="$(ssh $node "rpm -q docker docker-selinux")"
+    [[ -z "$out" ]] && {
+      echo "ERROR: docker and docker-selinux not installed on node $node";
+      return 1; }
+    (( $(wc -l <<<"$out") == 2 )) && continue # have needed dockers installed
+    if grep -v 'docker-selinux' <<<"$out"; then
+      echo "ERROR: docker-selinux missing on node $node"
+    else
+      echo "ERROR: docker missing on node $node"
+    fi
+    return 1 # error
+  done
 
   # NOTE: this HostDir test only applies to the general tests which are no
   #   longer supported.
