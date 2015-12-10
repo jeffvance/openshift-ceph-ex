@@ -393,7 +393,7 @@ function id_in_range() {
 # sets the SGIDs, SUIDs, OS_SGID, OS_SUID, USE_SGIDS, and USE_BLK_GID global
 # variables to the values found in the project definition for the passed-in
 # namespace. 
-# Note: ID ranges have 2 formats: <start/cnt> or <start>-<end>
+# Note: ID ranges have 2 formats: <start>/<cnt> or <start>-<end>
 function get_supplemental_ids() {
 
   local ns="$1"
@@ -792,7 +792,7 @@ function verify_perms() {
   function pod_exec() {
     local cmd="$@"
 
-    # exeute $cmd in target pod/container (some trickery...)
+    # execute $cmd in target pod/container (some trickery...)
     out="$(ssh $MASTER "
                ${OC_PREFIX}oc exec $pod -- sh -c 'echo \"\$($cmd 2>&1)\"'
         ")"
@@ -1156,7 +1156,7 @@ function verify_ceph_setup() {
 
 # If the passed-in gid is already a number then it is echo'd as-is and 0 is
 # returned. Otherwise, the passed-in gid is converted to its corresponding 
-# numeric value, via ssh to the passed-in target server, and the numberic
+# numeric value, via ssh to the passed-in target server, and the numeric
 # value is output. Returns 1 and echos a generic error msg if getent returns
 # an error. In this case the caller should set their gid var to "".
 # $1=gid value, $2=remote server
